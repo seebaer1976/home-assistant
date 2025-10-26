@@ -25,9 +25,11 @@ blueprint:
     **Ziel-Entität**: **Ihre Better Thermostat (BT) Klima-Entität.**
   source_url: https://github.com/seebaer1976/home-assistant/blob/main/blueprints/trhs-steuerung.yaml
   domain: automation
+  
+  # NEUE STRUKTUR STARTET HIER
   input:
     thermostat_section:
-      name: Better Thermostat Entität
+      name: 🔥 Thermostat & HVAC-Modus
       icon: mdi:thermostat-box
       input:
         input_trvs:
@@ -55,28 +57,14 @@ blueprint:
                 - heat_cool
 
     temperature_section:
-      name: Temperaturen
-      icon: mdi:thermometer
-      collapsed: true
+      name: 🌡️ Ziel-Temperaturen & Frostschutz
+      icon: mdi:thermometer-high
+      collapsed: false
       input:
-        input_temperature_sensor:
-          name: Raumtemperatursensor (Nur für globale Aktivierung)
-          description: >
-            Wird nur für die Logik der **globalen Aktivierung** in Kombination mit dem *Raumtemperatur-Schwellenwert* verwendet.
-          default: []
-          selector:
-            entity:
-              filter:
-                - domain:
-                    - sensor
-                  device_class:
-                    - temperature
-              multiple: false
-              
         input_temperature_comfort_static:
-          name: Ziel-Temperatur
+          name: ☀️ Komfort-Temperatur (Statisch)
           description: >
-            Hier können Sie eine Ziel-Temperatur festlegen.
+            Die Ziel-Temperatur für den Komfort-Modus (Heizplan aktiv / Zuhause).
           default: 22
           selector:
             number:
@@ -87,9 +75,9 @@ blueprint:
               unit_of_measurement: °C / °F
 
         input_temperature_eco_static:
-          name: Eco-Temperatur
+          name: 🌙 Eco-Temperatur (Statisch)
           description: >
-            Die Temperatur, die eingestellt wird, wenn Ihr Heizplan nicht aktiv ist.
+            Die Temperatur, die eingestellt wird, wenn der Komfort-Modus nicht aktiv ist.
           default: 19
           selector:
             number:
@@ -98,11 +86,25 @@ blueprint:
               step: 0.5
               mode: box
               unit_of_measurement: °C / °F
-
-        input_temperature_comfort:
-          name: Ziel-Temperatur (Entität)
+              
+        input_frost_protection_temp:
+          name: ❄️ Frostschutz-Temperatur
           description: >
-            Um Ihre Ziel-Temperatur über Automationen oder die Benutzeroberfläche zu steuern, können Sie hier eine *[input_number](https://www.home-assistant.io/integrations/input_number/)* Entität angeben.
+            Temperatur, die eingestellt wird, wenn der Frostschutz aktiv ist (z.B. nach langer Abwesenheit).
+          default: 5
+          selector:
+            number:
+              min: 5.0
+              max: 62.0
+              step: 0.5
+              mode: box
+              unit_of_measurement: °C / °F
+
+        # Optionale Entitäten für dynamische Temperaturen
+        input_temperature_comfort:
+          name: Komfort-Temperatur (Entität)
+          description: >
+            (Optional) Entität (z.B. `input_number`) zur dynamischen Steuerung der Ziel-Temperatur.
           default: []
           selector:
             entity:
@@ -114,7 +116,7 @@ blueprint:
         input_temperature_eco:
           name: Eco-Temperatur (Entität)
           description: >
-            Um Ihre Eco-Temperatur über Automationen oder die Benutzeroberfläche zu steuern, können Sie hier eine *[input_number](https://www.home-assistant.io/integrations/input_number/)* Entität angeben.
+            (Optional) Entität (z.B. `input_number`) zur dynamischen Steuerung der Eco-Temperatur.
           default: []
           selector:
             entity:
@@ -123,54 +125,16 @@ blueprint:
                     - input_number
               multiple: false
 
-    person_section:
-      name: Personen
-      icon: mdi:account-multiple
+    logic_section:
+      name: 👤 Zeit- & Anwesenheitslogik
+      icon: mdi:account-clock
       collapsed: true
       input:
-        input_persons:
-          name: Personen
-          description: >
-            Sie können [Personen](https://www.home-assistant.io/integrations/person/) angeben, um Ihren Heizplan dynamischer zu gestalten.
-          default: []
-          selector:
-            entity:
-              filter:
-                - domain:
-                    - person
-              multiple: true
-
-        input_people_entering_home_duration:
-          name: Ankunfts-Dauer (Zuhause)
-          description: >
-            Dauer, die jemand zuhause sein muss, damit die Heizung aktiviert wird.
-          default:
-            hours: 0
-            minutes: 0
-            seconds: 2
-          selector:
-            duration:
-
-        input_people_leaving_home_duration:
-          name: Abwesenheits-Dauer (Verlassen)
-          description: >
-            Dauer, die jemand abwesend sein muss, damit die Heizung deaktiviert wird.
-          default:
-            hours: 0
-            minutes: 0
-            seconds: 2
-          selector:
-            duration:
-
-    scheduling_section:
-      name: Zeitplanung
-      icon: mdi:clock-outline
-      collapsed: true
-      input:
+        # Zeitplanung
         input_schedulers:
-          name: Zeitpläne
+          name: 🗓️ Zeitpläne (Schedule Entitäten)
           description: >
-            Ein [Zeitplan](https://www.home-assistant.io/integrations/schedule/) legt fest, wann auf Ziel-Temperatur geheizt werden soll.
+            Ein [Zeitplan](https://www.home-assistant.io/integrations/schedule/) legt fest, wann auf Komfort-Temperatur geheizt werden soll.
           default: []
           selector:
             entity:
@@ -180,9 +144,9 @@ blueprint:
               multiple: true
 
         input_scheduler_selector:
-          name: Zeitplan-Auswahl
+          name: 🎛️ Zeitplan-Umschalter
           description: >
-            Definieren Sie eine Entität zur Auswahl Ihrer Zeitpläne (z.B. Dropdown-Helfer).
+            (Optional) Definiert eine Entität zur Auswahl oder Aktivierung/Deaktivierung spezifischer Zeitpläne.
           default:
           selector:
             entity:
@@ -190,31 +154,46 @@ blueprint:
                 - domain:
                     - input_boolean
                     - binary_sensor
-                    - input_text
-                    - input_number
                     - input_select
               multiple: false
-
-    frostprotection_section:
-      name: Frostschutz (Abwesenheit)
-      icon: mdi:snowflake
-      collapsed: true
-      input:
-        input_frost_protection_temp:
-          name: Frostschutz-Temperatur
+              
+        # Personen
+        input_persons:
+          name: 👥 Personen
           description: >
-            Temperatur, die eingestellt wird, wenn der Frostschutz aktiv ist.
-          default: 5
+            [Personen](https://www.home-assistant.io/integrations/person/) angeben, um den Heizplan dynamisch zu steuern (z.B. Abwesenheit = Eco/Frostschutz).
+          default: []
           selector:
-            number:
-              min: 5.0
-              max: 62.0
-              step: 0.5
-              mode: box
-              unit_of_measurement: °C / °F
+            entity:
+              filter:
+                - domain:
+                    - person
+              multiple: true
+
+        input_people_entering_home_duration:
+          name: Ankunfts-Verzögerung
+          description: >
+            Dauer, die jemand zuhause sein muss, bevor der Komfort-Modus aktiv wird.
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 2
+          selector:
+            duration:
+
+        input_people_leaving_home_duration:
+          name: Abwesenheits-Verzögerung
+          description: >
+            Dauer, die jemand abwesend sein muss, bevor auf Eco/Frostschutz umgeschaltet wird.
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 2
+          selector:
+            duration:
 
         input_frost_protection_duration:
-          name: Frostschutz-Fallback-Dauer
+          name: Frostschutz-Verzögerung (Abwesenheit)
           description: >
             Wenn Personen länger als diese Dauer abwesend sind, wird die Frostschutz-Temperatur eingestellt.
             *Hinweis: Bei 0 bleibt es bei Eco-Temperatur.*
@@ -228,14 +207,14 @@ blueprint:
               enable_day: true
 
     toggle_section:
-      name: "Optionen zum Ein/Ausschalten der Automation"
+      name: ⚙️ Globale Ein-/Ausschalt-Optionen
       icon: mdi:light-switch
       collapsed: true
       input:
         input_mode_winter:
-          name: Wintermodus / Automation Umschalter
+          name: Wintermodus / Master-Umschalter
           description: >
-            Wenn *an*, ist die Automation aktiv. Wenn *aus*, werden Ihre Ventile auf *off* gesetzt.
+            (Optional) Wenn *aus*, wird die gesamte Automation deaktiviert und alle BT-Entitäten auf *off* gesetzt.
           default:
           selector:
             entity:
@@ -246,17 +225,18 @@ blueprint:
               multiple: false
 
         input_invert_winter_mode_value:
-          name: Wert des Wintermodus umkehren
+          name: Wert des Umschalters umkehren
           description: >
-            Kehrt den Wert der binären Wintermodus-Entität um.
+            Kehrt den Wert der binären Entität um (z.B. *Aus* bedeutet aktiv).
           default: off
           selector:
             boolean:
 
+        # Außentemperatur-Logik
         input_mode_outside_temperature:
-          name: Außentemperatursensor
+          name: Außentemperatur-Sensor
           description: >
-            Temperatursensor oder Wetter-Entität zur Steuerung des Ein-/Ausschaltens der Heizung.
+            (Optional) Steuert die Heizung nur, wenn die Außentemperatur unter dem Schwellenwert liegt.
           default:
           selector:
             entity:
@@ -281,10 +261,25 @@ blueprint:
               mode: box
               unit_of_measurement: °C / °F
 
+        # Raumtemperatur-Logik
+        input_temperature_sensor:
+          name: Raumtemperatursensor (Für globale Aktivierung)
+          description: >
+            (Optional) Ein Raumtemperatursensor, der für die globale Aktivierungslogik verwendet wird.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - sensor
+                  device_class:
+                    - temperature
+              multiple: false
+
         input_mode_room_temperature:
           name: Raumtemperatur-Schwellenwert aktivieren
           description: >
-            Aktiviert die Prüfung, ob auch die Raumtemperatur unter/über ihrem Schwellenwert liegt. (Benötigt `Raumtemperatursensor`)
+            Aktiviert die Prüfung, ob auch die Raumtemperatur unter/über ihrem Schwellenwert liegt (Benötigt `Raumtemperatursensor`).
           default: false
           selector:
             boolean:
