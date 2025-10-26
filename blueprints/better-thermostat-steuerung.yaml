@@ -233,7 +233,7 @@ variables:
   comfort_temp: >
     {% set temp_value = state_attr(input_temperature_comfort, 'state') | default(states(input_temperature_comfort), true) | default(namespace(s = 0)) %}
     {% if temp_value.s == 0 %}
-      {{ !input input_temperature_comfort_static | float }}
+      {{ input_temperature_comfort_static | float }}  
     {% else %}
       {{ temp_value | float }}
     {% endif %}
@@ -242,7 +242,7 @@ variables:
   eco_temp: >
     {% set temp_value = state_attr(input_temperature_eco, 'state') | default(states(input_temperature_eco), true) | default(namespace(s = 0)) %}
     {% if temp_value.s == 0 %}
-      {{ !input input_temperature_eco_static | float }}
+      {{ input_temperature_eco_static | float }}
     {% else %}
       {{ temp_value | float }}
     {% endif %}
@@ -341,7 +341,6 @@ trigger:
   - platform: state
     entity_id: "{{ input_trvs }}"
     attribute: hvac_mode
-    # Hier feuert der Trigger auch, wenn BT den Zustand auf 'off' setzt
     id: trv_hvac_mode_change
 
   # 4. Auslöser für Änderungen anderer relevanter Entitäten
