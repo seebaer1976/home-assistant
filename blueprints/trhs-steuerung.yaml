@@ -1,0 +1,1488 @@
+blueprint:
+  name: Erweiterte Heizungssteuerung V5 (Basis)
+  author: panhans
+  homeassistant:
+    min_version: "2024.10.0"
+  description: >
+    🔥 Basis-Version der erweiterten Heizungssteuerung V5.
+
+
+    > Reduziert auf Kernfunktionen:
+
+    Anwesenheit von Personen
+
+    Zeitpläne (Scheduler)
+
+
+    Frostschutz
+
+    Einstellbarer Aggressiver Modus
+
+    Aktivierung basierend auf Wetter/Temperatur
+
+    Erkennung offener Fenster
+
+    Verkalkungsschutz
+
+    Thermostat-Kalibrierung (Tado, Aqara, Generisch)
+
+
+    **Version**: 5.3.4 (Basis - stark reduziert)
+
+    **Hilfe & FAQ**: [Advanced Heating Control](https://community.home-assistant.io/t/advanced-heating-control/469873)
+  source_url: https://github.com/panhans/HomeAssistant/blob/main/blueprints/automation/panhans/advanced_heating_control.yaml
+  domain: automation
+  input:
+    thermostat_section:
+      name: Thermostate & Sensoren
+      icon: mdi:thermostat
+      input:
+        input_trvs:
+          name: Thermostate / Klimageräte
+          description: >
+            `thermostats` `climates` 
+
+
+            [Thermostate / Klimageräte](https://www.home-assistant.io/integrations/climate/), die gesteuert werden sollen.
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - climate
+              multiple: true
+
+        input_hvac_mode:
+          name: Betrieb / HVAC-Modus
+          description: >
+            `hvac`
+
+
+            Wählen Sie den HVAC-Modus für Ihre [Thermostate](https://www.home-assistant.io/integrations/climate/) aus. Stellen Sie sicher, dass Ihre ausgewählten Thermostate den gewählten HVAC-Modus unterstützen.
+            AHC wird eine Warnung protokollieren, wenn es eine Nichtübereinstimmung gibt. Für Heizkörper-[Thermostate]((https://www.home-assistant.io/integrations/climate/)) ist der Standard meistens *heat* (Heizen).
+            Wenn Sie eine Klimaanlage besitzen, wird diese auch *auto* (Auto) oder *cool* (Kühlen) unterstützen.
+          default: "heat"
+          selector:
+            select:
+              options:
+                - heat
+                - cool
+                - auto
+                - heat_cool
+
+        input_temperature_sensor:
+          name: Raumtemperatursensor
+          description: >
+            `calibration` `aggressive mode` `optional`
+
+
+            Für einige Funktionen ist ein externer Temperatursensor erforderlich, z.B. Kalibrierung.
+
+            Temperaturkalibrierung für Ihre [Thermostate](https://www.home-assistant.io/integrations/climate/). Folgendes wird unterstützt:
+
+              * Tado, Aqara, Popp, Danfoss, Hive, Tuya
+              * Generische Kalibrierung
+
+            Hinweis: Dies ist ein zusätzlicher Sensor in Ihrem Raum, normalerweise an Ihrem Lieblingsplatz. [Thermostate](https://www.home-assistant.io/integrations/climate/) oder deren Integration (z.B. Z2M oder ZHA), außer Tado, sollten eine separate Kalibrierungs-Entität bereitstellen.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - sensor
+                  device_class:
+                    - temperature
+              multiple: false
+
+    temperature_section:
+      name: Temperaturen
+      icon: mdi:thermometer
+      collapsed: true
+      input:
+        input_temperature_comfort_static:
+          name: Statische Komfort-Temperatur
+          description: >
+            `comfort temperature`
+
+
+            Hier können Sie eine statische Komfort-Temperatur festlegen.
+          default: 22
+          selector:
+            number:
+              min: 12.0
+              max: 86.0
+              step: 0.5
+              mode: box
+              unit_of_measurement: °C / °F
+
+        input_temperature_eco_static:
+          name: Statische Eco-Temperatur
+          description: >
+            `eco temperature`
+
+
+            Die Temperatur, die eingestellt wird, wenn Ihr Heizplan nicht aktiv ist.
+          default: 19
+          selector:
+            number:
+              min: 4.0
+              max: 75.0
+              step: 0.5
+              mode: box
+              unit_of_measurement: °C / °F
+
+        input_temperature_comfort:
+          name: Komfort-Temperatur (Entität)
+          description: >
+            `comfort temperature` `optional`
+
+
+            Um Ihre Komfort-Temperatur über Automationen oder die Benutzeroberfläche zu steuern, können Sie hier eine *[input_number](https://www.home-assistant.io/integrations/input_number/)* Entität angeben.
+
+
+            Erstellen Sie Ihren Helfer [hier](https://my.home-assistant.io/redirect/helpers/).
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - input_number
+              multiple: false
+
+        input_temperature_eco:
+          name: Eco-Temperatur (Entität)
+          description: >
+            `eco temperature` `optional`
+
+
+            Um Ihre Eco-Temperatur über Automationen oder die Benutzeroberfläche zu steuern, können Sie hier eine *[input_number](https://www.home-assistant.io/integrations/input_number/)* Entität angeben.
+
+
+            Erstellen Sie Ihren Helfer [hier](https://my.home-assistant.io/redirect/helpers/).
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - input_number
+              multiple: false
+
+    temperature_tweak_section:
+      name: Temperatur-Optimierungen
+      icon: mdi:knob
+      collapsed: true
+      input:
+        input_off_instead_of_eco:
+          name: Aus statt Eco
+          description: >
+            `optional` `temperature tweak`
+
+
+            Schalten Sie Ihre [Thermostate](https://www.home-assistant.io/integrations/climate/) aus, anstatt die Ziel-Temperatur auf Eco-Temperatur zu senken.
+          default: false
+          selector:
+            boolean:
+
+        input_min_instead_of_off:
+          name: Min. statt Aus
+          description: >
+            `optional` `temperature tweak`
+
+
+            Temperatur absenken (auf Minimum), anstatt sie *AUS*zuschalten, z.B. während des Lüftens.
+          default: false
+          selector:
+            boolean:
+
+        input_fahrenheit:
+          name: Fahrenheit
+          description: >
+            `optional` `temperature tweak`
+
+
+            Aktivieren, wenn Ihre Maßeinheit Fahrenheit ist (ungetestet).
+          default: false
+          selector:
+            boolean:
+
+        input_reset_temperature:
+          name: Temperatur zurücksetzen
+          description: >
+            `optional` `temperature tweak`
+
+
+            Setzt Ihre Temperatur-Entitäten (Helfer) auf die statischen Temperaturwerte zurück, nachdem [Zeitplan](https://www.home-assistant.io/integrations/schedule/), [Personen](https://www.home-assistant.io/integrations/person/) enden.
+            Die Komfort-Entität wird zurückgesetzt, wenn Eco aktiv wird, und umgekehrt.
+          default: false
+          selector:
+            boolean:
+
+        input_off_if_above_room_temperature:
+          name: Aus bei Über-/Unterschreitung der Raumtemperatur
+          description: >
+
+            Schaltet Ihre [Klima](https://www.home-assistant.io/integrations/climate/)-Entität *aus*, wenn die Ziel-Temperatur unter (Kühlen) / über (Heizen) der Raumtemperatur liegt.
+
+          default: false
+          selector:
+            boolean:
+
+        input_off_if_nobody_home:
+          name: Aus, wenn niemand zuhause ist
+          description: >
+
+            Schaltet Ihre [Klima](https://www.home-assistant.io/integrations/climate/)-Entität *aus*, wenn Personen definiert sind und niemand zuhause ist.
+
+          default: false
+          selector:
+            boolean:
+
+        input_physical_change:
+          name: Physische Temperaturänderung / Sync (experimentell)
+          description: >
+            `optional` `temperature tweak`
+
+
+            Aktivieren, wenn Sie die Temperatur direkt am Thermostat oder über die Thermostat-Karte anpassen möchten. Stellen Sie sicher, dass der aggressive Modus und die generische Kalibrierung hierfür deaktiviert sind. (experimentell).
+            Sie müssen hierfür aktuell auch Entitäten (Helfer) für die Eco- und Komfort-Temperatur festgelegt haben.
+          default: false
+          selector:
+            boolean:
+
+    person_section:
+      name: Personen
+      icon: mdi:account-multiple
+      collapsed: true
+      input:
+        input_persons:
+          name: Personen
+          description: >
+            `person` `optional`
+
+
+            Sie können [Personen](https://www.home-assistant.io/integrations/person/) angeben, um Ihren Heizplan dynamischer zu gestalten. Wenn Sie keine [Zeitpläne](https://www.home-assistant.io/integrations/schedule/) verwenden, wird die Heizung aktiviert, sobald jemand zuhause ist.<br/>
+            Mit [Zeitplänen](https://www.home-assistant.io/integrations/schedule/) sind diese nur aktiv, wenn auch jemand zuhause ist.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - person
+              multiple: true
+
+        input_people_entering_home_duration:
+          name: Ankunfts-Dauer (Zuhause)
+          description: >
+            `person`
+
+
+            Dauer, die jemand zuhause sein muss, damit die Heizung aktiviert wird.
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 2
+          selector:
+            duration:
+
+        input_people_leaving_home_duration:
+          name: Abwesenheits-Dauer (Verlassen)
+          description: >
+            `person`
+
+
+            Dauer, die jemand abwesend sein muss, damit die Heizung deaktiviert wird.
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 2
+          selector:
+            duration:
+
+    scheduling_section:
+      name: Zeitplanung
+      icon: mdi:clock-outline
+      collapsed: true
+      input:
+        input_schedulers:
+          name: Zeitpläne
+          description: >
+            `schedules` `optional`
+
+
+            Ein [Zeitplan](https://www.home-assistant.io/integrations/schedule/) legt fest, wann auf Komfort-Temperatur geheizt werden soll. Sie können ihn im Helfer-Bereich von Home Assistant erstellen.<br/>
+            Wenn Sie auch [Personen](https://www.home-assistant.io/integrations/person/) angegeben haben, muss auch jemand zuhause sein, damit geheizt wird.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - schedule
+              multiple: true
+
+        input_scheduler_selector:
+          name: Zeitplan-Auswahl
+          description: >
+            `schedule` `optional`
+
+
+            Definieren Sie eine Entität zur Auswahl Ihrer Zeitpläne. Wenn Sie nur einen Zeitplan verwenden, können Sie dies ignorieren. Bei mehreren Zeitplänen haben Sie verschiedene Möglichkeiten zur Einrichtung.<br/>
+
+            <details>
+            <summary><code><strong>HIER KLICKEN:</strong> Mehr Informationen</code></summary>
+            <br/>
+
+
+
+            * Umschalter [input_boolean](https://www.home-assistant.io/integrations/input_boolean/) oder [binary_sensor](https://www.home-assistant.io/integrations/binary_sensor/): Wenn *aus*, ist der erste definierte [Zeitplan](https://www.home-assistant.io/integrations/schedule/) aktiv. Wenn *an*, ist der zweite [Zeitplan](https://www.home-assistant.io/integrations/schedule/) aktiv. Mehr als zwei [Zeitpläne](https://www.home-assistant.io/integrations/schedule/) können so nicht ausgewählt werden.
+
+            * Text [input text](https://www.home-assistant.io/integrations/input_text/), Dropdown [input select](https://www.home-assistant.io/integrations/input_select/) oder [sensor](https://www.home-assistant.io/integrations/sensor/):
+              * Der Wert muss (teilweise) mit dem Anzeigenamen (friendly name) des ausgewählten [Zeitplans](https://www.home-assistant.io/integrations/schedule/) übereinstimmen. Beispiel: Bei drei [Zeitplänen](https://www.home-assistant.io/integrations/schedule/) namens *Arbeit*, *Urlaub/Krank*, *Gast* können Sie den Urlaubs-[Zeitplan](https://www.home-assistant.io/integrations/schedule/) auswählen, indem Sie die Auswahl-Entität auf *Krank*, *Urlaub* oder *Urlaub/Krank* setzen. Groß-/Kleinschreibung wird ignoriert.
+              * Sie können auch Zahlen verwenden: Um den ersten [Zeitplan](https://www.home-assistant.io/integrations/schedule/) zu wählen, muss die Entität die Zahl *1* zurückgeben. Für den 2. die *2* usw.
+
+            </details>
+          default:
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - input_boolean
+                    - binary_sensor
+                    - input_text
+                    - input_number
+                    - input_select
+              multiple: false
+
+    window_section:
+      name: Fenster- & Türerkennung
+      icon: mdi:door
+      collapsed: true
+      input:
+        input_windows:
+          name: Fenster & Türen
+          description: >
+            `airing` `optional`
+
+
+            Wenn diese beim Lüften geöffnet sind, werden Ihre [Thermostate](https://www.home-assistant.io/integrations/climate/) auf *aus* (oder zumindest auf ihre Mindesttemperatur) gesetzt, 
+            falls sie den HVAC-Modus *OFF* nicht unterstützen, es sei denn, Sie legen eine benutzerdefinierte Temperatur bei offenem Fenster fest.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - binary_sensor
+                    - sensor
+              multiple: true
+
+        input_windows_reaction_time_open:
+          name: Reaktionszeit Fenster/Tür Öffnen
+          description: >
+            `airing`
+
+
+            Dauer, die ein Fenster oder eine Tür geöffnet sein muss, damit die [Thermostate](https://www.home-assistant.io/integrations/climate/) schließen (Heizen stoppen).
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 30
+          selector:
+            duration:
+
+        input_windows_reaction_time_close:
+          name: Reaktionszeit Fenster/Tür Schließen
+          description: >
+            `airing`  
+
+
+            Dauer, die ein Fenster oder eine Tür geschlossen sein muss, damit die [Thermostate](https://www.home-assistant.io/integrations/climate/) öffnen (Heizen wieder aufnehmen).
+          default:
+            hours: 0
+            minutes: 0
+            seconds: 30
+          selector:
+            duration:
+
+        input_window_open_temperature:
+          name: Temperatur bei offenem Fenster
+          description: >
+            `airing` 
+
+
+            Bei 0° schaltet Ihr Thermostat *aus* oder, falls nicht unterstützt, auf die Mindesttemperatur Ihres Thermostats.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 15
+              step: 1
+              mode: slider
+              unit_of_measurement: °C / °F
+
+        input_window_legacy_restore:
+          name: Legacy-Wiederherstellung
+          description: >
+            `airing` 
+
+
+            Aktivieren, wenn die Temperaturen nach dem Lüften (Schließen der Fenster) nicht korrekt wiederhergestellt werden.
+          default: false
+          selector:
+            boolean:
+
+    calibration_section:
+      name: Kalibrierung
+      icon: mdi:compass
+      description: ""
+      collapsed: true
+      input:
+        input_calibration_timeout:
+          name: Kalibrierungs-Timeout
+          description: >
+            `calibration`
+
+
+            Definieren Sie ein Timeout, wenn Sie die Anzahl der Kalibrierungsaufrufe reduzieren möchten, falls sich die Temperatur zu schnell ändert.
+            Die Temperatur des externen Sensors oder [Thermostats](https://www.home-assistant.io/integrations/climate/) muss mindestens für diese Dauer stabil bleiben, bevor die Kalibrierung ausgelöst wird.
+
+            **HINWEIS:** Ein Mindest-Timeout von 2s wird empfohlen.
+          default:
+            hours: 0
+            minutes: 1
+            seconds: 0
+          selector:
+            duration:
+
+        input_calibration_delta:
+          name: Kalibrierungs-Delta
+          description: >
+            `calibration`
+
+
+            Wenn die Differenz zwischen der [Thermostat](https://www.home-assistant.io/integrations/climate/)-Temperatur und der externen Sensortemperatur größer oder kleiner als das Kalibrierungs-Delta ist, wird die [Thermostat](https://www.home-assistant.io/integrations/climate/)-Kalibrierung ausgelöst.<br/>
+            Je kleiner das Delta, desto öfter wird die Kalibrierung ausgelöst.
+          default: 0.5
+          selector:
+            number:
+              min: 0
+              max: 5
+              step: 0.1
+              mode: slider
+              unit_of_measurement: °C / °F
+
+        input_calibration_key_word:
+          name: Schlüsselwort für Kalibrierungs-Entität
+          description: >
+            `calibration`
+
+
+            Schlüsselwort, um die Kalibrierungs-Entität zu finden. Dieses Wort muss Teil der Entitäts-ID sein. 
+            In der Regel werden Entitäten mit den Wörtern *offset*, *calibration* oder *external* von den Integrationen markiert. Sehen Sie in Ihrer Geräteübersicht nach, wählen Sie Ihr Thermostat und prüfen Sie die Benennung der *entity_ids* für die Kalibrierung.
+          default: "calibration"
+          selector:
+            text:
+
+        input_calibration_step_size:
+          name: Schrittgröße
+          description: >
+            `calibration`
+
+
+            Normalerweise wird die Schrittgröße automatisch ermittelt. Sie können die Schrittgröße überschreiben, indem Sie eine andere Option wählen, wenn Sie wissen, dass Ihr Thermostat die Kalibrierung anders handhabt, als die Entitäten es anzeigen.
+          default: auto
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - label: Auto
+                  value: auto
+                - label: "0.1"
+                  value: "0.1"
+                - label: "0.5"
+                  value: "0.5"
+                - label: "Ganze Werte"
+                  value: "full"
+
+        input_calibration_generic:
+          name: Generische Kalibrierung
+          description: >
+            `generic` `calibration`
+
+
+            Addiert die Differenz zwischen Raum- und [Thermostat](https://www.home-assistant.io/integrations/climate/)-Temperatur zur Ziel-Temperatur. Dies ist nützlich, wenn Ihre Thermostat-Integration keine spezielle Entität für die Kalibrierung bereitstellt.
+            Beachten Sie, dass die am Thermostat eingestellten Temperaturen von der Ziel-Temperatur abweichen werden.
+          default: false
+          selector:
+            boolean:
+
+        input_generic_calibration_offset:
+          name: Generischer Kalibrierungs-Offset
+          description: >
+            `generic` `calibration`
+
+
+            Wenn die Temperaturdifferenz zwischen Thermostat und Temperatursensor sehr hoch ist, 
+            kann der Offset (d.h. die Korrekturtemperatur) auf diesen Wert begrenzt werden.
+
+            <details>
+            <summary><code><strong>HIER KLICKEN:</strong> Beispiel</code></summary>
+            Generischer Kalibrierungs-Offset = 5°</br>
+            Thermostat-Temperatur = 28°</br>
+            Raumtemperatur = 18°</br>
+            </br>
+            Differenz = Thermostat-Temperatur - Raumtemperatur = 10°</br>
+            Differenz > Generischer Kalibrierungs-Offset -> Korrigierte Differenz = 5°</br>
+            Neue Ziel-Temperatur = Thermostat-Temperatur + Korrigierte Differenz = 33°
+            </details>
+          default: 5
+          selector:
+            number:
+              min: 0
+              max: 20
+              step: 1
+              mode: slider
+              unit_of_measurement: °C / °F
+
+    aggressive_mode_section:
+      name: Aggressiver Modus
+      icon: mdi:emoticon-angry
+      collapsed: true
+      input:
+        input_aggressive_mode_range:
+          name: Aggressiver Bereich
+          description: >
+            `aggressive mode` `tweak`
+
+
+            Aktivieren Sie diese Option, wenn Ihre [Thermostate](https://www.home-assistant.io/integrations/climate/) langsam reagieren oder erst bei großer Temperaturdifferenz 
+            zwischen Ist- und Soll-Temperatur reagieren.
+            Definieren Sie einen Bereich, in dem Ihre reale Ziel-Temperatur gesetzt werden soll. 
+
+            <details>
+            <summary><code><strong>HIER KLICKEN:</strong> Mehr Informationen</code></summary>
+            <br/>
+
+            Z.B. Ihre Ziel-Temperatur ist 20°C und Ihre Raumtemperatur ist 19.5°C.
+            Wenn Ihr Bereich auf 0.5°C eingestellt ist, wird die reale Ziel-Temperatur (20°C) gesetzt, wenn die Raumtemperatur zwischen 19.5°C und 20.5°C liegt.
+            Liegt die Raumtemperatur über oder unter diesem Bereich, wird ein Offset addiert, um das [Thermostat](https://www.home-assistant.io/integrations/climate/) zur Reaktion zu zwingen. 
+            (Siehe Aggressiver Modus - Offset)
+
+            </details>
+
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 5
+              step: 0.1
+              mode: slider
+              unit_of_measurement: °C / °F
+
+        input_aggressive_mode_offset:
+          name: Aggressiver Offset
+          description: >
+            `aggressive mode` `tweak`
+
+
+            Hier definieren Sie den Offset, der zu Ihrer Ziel-Temperatur addiert wird, wenn die Raumtemperatur nicht im Ziel-Bereich liegt.
+            Wenn Ihre Raumtemperatur nicht im definierten Bereich liegt (z.B. 19.5°C - 20.5°C), wird dieser Offset zu Ihrer Ziel-Temperatur addiert. Wenn der Bereich 0 ist, wird der Offset immer addiert.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 5
+              step: 0.5
+              mode: slider
+              unit_of_measurement: °C / °F
+
+        input_aggressive_mode_calibration:
+          name: Aggressive Kalibrierung
+          description: >
+            `aggressive mode` `tweak` `experimental` 
+
+            Wenn Sie einen Temperatursensor eingerichtet haben und Ihre Thermostate eine Kalibrierung zulassen, können Sie diese Funktion aktivieren. Wenn aktiviert, wird der aggressive Offset
+            zum Kalibrierungswert addiert und nicht zur Ziel-Temperatur.
+
+            *Hinweis*: Diese Funktion ist experimentell, da nicht jede Kalibrierungsmethode getestet werden konnte. Bei Problemen öffnen Sie ein Issue oder 
+            posten Sie im [AHC-Thread](https://community.home-assistant.io/t/advanced-heating-control/469873). 
+            Nur aktivieren, wenn die native Kalibrierung bei Verwendung der generischen Kalibrierung NICHT funktioniert.
+          default: false
+          selector:
+            boolean:
+
+    frostprotection_section:
+      name: Frostschutz
+      icon: mdi:snowflake
+      collapsed: true
+      input:
+        input_frost_protection_temp:
+          name: Frostschutz-Temperatur
+          description: >
+            `frost protection`
+
+
+            Hier können Sie die Frostschutz-Temperatur einstellen.
+          default: 5
+          selector:
+            number:
+              min: 5.0
+              max: 62.0
+              step: 0.5
+              mode: box
+              unit_of_measurement: °C / °F
+
+        input_frost_protection_duration:
+          name: Frostschutz-Fallback-Dauer
+          description: >
+            `frost protection`
+
+
+            Wenn die definierten [Personen](https://www.home-assistant.io/integrations/person/) für längere Zeit abwesend sind, kann die Frostschutz-Temperatur nach dieser Dauer gesenkt werden.
+            Hinweis: Bei 0 wird die Frostschutz-Temperatur niemals gesetzt (d.h. es bleibt bei Eco).
+          default:
+            days: 0
+            hours: 0
+            minutes: 0
+            seconds: 0
+          selector:
+            duration:
+              enable_day: true
+
+    liming_protection_section:
+      name: Verkalkungsschutz
+      icon: mdi:pipe-valve
+      collapsed: true
+      input:
+        input_liming_protection:
+          name: Verkalkungsschutz
+          description: >
+            `liming protection`
+
+
+            Die meisten smarten Thermostate haben diese Funktion integriert. 
+            Wenn Ihr Thermostat dies nicht unterstützt oder Sie die generische Thermostat-Integration verwenden, könnte diese Funktion nützlich sein, um Ihr Ventil vor Kalkablagerungen zu schützen. 
+            Die Automation stellt das Thermostat auf Maximum und öffnet das Ventil für eine Minute.
+
+          default: off
+          selector:
+            boolean:
+
+        input_liming_protection_day:
+          name: Tag
+          description: >
+            `liming protection`
+
+
+            Wählen Sie den Wochentag für die Ausführung.
+          default: "Mon"
+          selector:
+            select:
+              options:
+                - label: Montag
+                  value: Mon
+                - label: Dienstag
+                  value: Tue
+                - label: Mittwoch
+                  value: Wed
+                - label: Donnerstag
+                  value: Thu
+                - label: Freitag
+                  value: Fri
+                - label: Samstag
+                  value: Sat
+                - label: Sonntag
+                  value: Sun
+
+        input_liming_protection_time:
+          name: Uhrzeit
+          description: >
+            `liming protection`
+
+
+            Wählen Sie die Uhrzeit für die Ausführung.
+          default: "12:00:00"
+          selector:
+            time:
+
+        input_liming_protection_duration:
+          name: Dauer des Verkalkungsschutzes
+          description: >
+            `liming protection`
+
+
+            Dauer des Verkalkungsschutzes, bevor der Thermostat in seinen Ausgangszustand zurückgesetzt wird.
+          default: 1
+          selector:
+            number:
+              min: 1
+              max: 30
+              step: 1
+              mode: slider
+              unit_of_measurement: min
+
+        input_liming_in_winter:
+          name: Verkalkungsschutz im Winter / Wenn Automation deaktiviert ist
+          description: >
+            `liming protection`
+
+
+            Aktivieren, wenn der Verkalkungsschutz auch laufen soll, während die Automation (im Winter) aktiv ist.
+          default: false
+          selector:
+            boolean:
+
+    toggle_section:
+      name: "Optionen zum Ein/Ausschalten der Automation"
+      icon: mdi:light-switch
+      collapsed: true
+      input:
+        input_mode_winter:
+          name: Wintermodus / Automation Umschalter
+          description: >
+            `activation` `optional`
+
+
+            Wenn *an*, ist die Automation aktiv. Wenn *aus*, werden Ihre Ventile auf *aus* gesetzt und die Automation schläft.
+            Sie können dies einrichten mit:
+
+              * [input boolean](https://www.home-assistant.io/integrations/input_boolean/) (Eingabe-Schalter)
+              * [binary sensor](https://www.home-assistant.io/integrations/binary_sensor/) (Binärsensor)
+
+
+            Erstellen Sie Ihren Helfer [hier](https://my.home-assistant.io/redirect/helpers/).
+          default:
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - input_boolean
+                    - binary_sensor
+              multiple: false
+
+        input_invert_winter_mode_value:
+          name: Wert des Wintermodus umkehren
+          description: >
+            `activation`
+
+
+            Wenn aktiviert, wird der Wert der binären Wintermodus-Entität umgekehrt:
+
+              * aus -> aktiviert die Automation
+              * an -> deaktiviert die Automation
+          default: off
+          selector:
+            boolean:
+
+        input_mode_outside_temperature:
+          name: Außentemperatursensor
+          description: >
+            `activation` `optional`
+
+
+            Sie können das Ein- und Ausschalten Ihrer Thermostate über die Außentemperatur steuern. 
+            Wählen Sie dazu einen Temperatursensor oder eine Wetter-Entität und passen Sie den Schwellenwert unten an.
+
+              * [weather entity](https://www.home-assistant.io/integrations/weather/) (Wetter-Entität)
+              * [temperature sensor entity](https://www.home-assistant.io/integrations/sensor/) (Temperatursensor-Entität)
+
+          default:
+          selector:
+            entity:
+              filter:
+                - domain:
+                    - weather
+                - domain:
+                    - sensor
+                  device_class: temperature
+              multiple: false
+
+        input_mode_outside_temperature_threshold:
+          name: Außentemperatur-Schwellenwert
+          description: >
+            `activation`
+
+
+            Wenn Sie einen Temperatur-[Sensor](https://www.home-assistant.io/integrations/sensor/) oder eine [Wetter-Entität](https://www.home-assistant.io/integrations/weather/) 
+            zur Steuerung der Heizung ausgewählt haben, können Sie hier den Temperatur-Schwellenwert anpassen.
+            Fällt die Außentemperatur unter diesen Schwellenwert, wird die Heizung aktiviert.
+          default: 15
+          selector:
+            number:
+              min: 5
+              max: 68
+              step: 0.5
+              mode: box
+              unit_of_measurement: °C / °F
+
+        input_mode_room_temperature:
+          name: Raumtemperatur-Schwellenwert aktivieren
+          description: >
+            `activation` `optional`
+
+
+            Wenn Sie diese Option aktivieren, müssen die Werte des definierten Raumtemperatursensors UND der Außentemperatur
+            ihre jeweiligen Schwellenwerte über-/unterschreiten. Das ist sinnvoll, wenn Sie eine Klimaanlage (A/C) betreiben und der Raum noch aufgeheizt ist, es draußen aber bereits abgekühlt ist.
+
+
+            **Nicht empfohlen zum Heizen**
+
+          default: false
+          selector:
+            boolean:
+
+        input_mode_room_temperature_threshold:
+          name: Raumtemperatur-Schwellenwert
+          description: >
+            `activation`
+
+
+            Schwellenwert für Ihren Raumtemperatursensor.
+          default: 18
+          selector:
+            number:
+              min: 5
+              max: 68
+              step: 0.5
+              mode: box
+              unit_of_measurement: °C / °F
+
+variables:
+  # Thermostate / Sensoren
+  input_trvs: !input input_trvs
+  input_temperature_sensor: !input input_temperature_sensor
+  is_temperature_sensor_defined: "{{ input_temperature_sensor != [] }}"
+
+  # Personen
+  input_persons: !input input_persons
+  input_people_entering_home_duration: !input input_people_entering_home_duration
+  input_people_leaving_home_duration: !input input_people_leaving_home_duration
+
+  input_person_count: "{{ input_persons | count }}"
+  is_person_defined: "{{ input_person_count > 0 }}"
+
+  # Zeitplaner
+  input_schedulers: !input input_schedulers
+  input_scheduler_selector: !input input_scheduler_selector
+
+  # Temperaturen
+  input_temperature_comfort: !input input_temperature_comfort
+  input_temperature_eco: !input input_temperature_eco
+  input_hvac_mode: !input input_hvac_mode
+  # Faktor ist 1 für Heizen und -1 für Kühlen (für Logik wie Offset-Anpassung)
+  factor: "{{ iif(input_hvac_mode == 'cool', -1, 1) | int }}"
+  input_off_if_above_room_temperature: !input input_off_if_above_room_temperature
+
+  # Ein/Aus
+  input_mode_winter: !input input_mode_winter
+  input_invert_winter_mode_value: !input input_invert_winter_mode_value
+  input_mode_outside_temperature: !input input_mode_outside_temperature
+  input_mode_outside_temperature_threshold: !input input_mode_outside_temperature_threshold
+  input_mode_room_temperature: !input input_mode_room_temperature
+  input_mode_room_temperature_threshold: !input input_mode_room_temperature_threshold
+
+  # Aggressiver Modus
+  input_aggressive_mode_range: !input input_aggressive_mode_range
+  input_aggressive_mode_offset: !input input_aggressive_mode_offset
+  input_aggressive_mode_calibration: !input input_aggressive_mode_calibration
+
+  # Fenster
+  input_windows: !input input_windows
+  input_windows_reaction_time_open: !input input_windows_reaction_time_open
+  input_windows_reaction_time_open_str: "{{ input_windows_reaction_time_open.hours | int }}h{{ input_windows_reaction_time_open.minutes | int }}m{{ input_windows_reaction_time_open.seconds | int }}s"
+  input_windows_reaction_time_close: !input input_windows_reaction_time_close
+  input_windows_reaction_time_close_str: "{{ input_windows_reaction_time_close.hours | int }}h{{ input_windows_reaction_time_close.minutes | int }}m{{ input_windows_reaction_time_close.seconds | int }}s"
+  input_window_open_temperature: !input input_window_open_temperature
+  input_window_legacy_restore: !input input_window_legacy_restore
+
+  # Kalibrierung
+  input_calibration_timeout: !input input_calibration_timeout
+  input_calibration_delta: !input input_calibration_delta
+  input_calibration_key_word: !input input_calibration_key_word
+  input_calibration_step_size: !input input_calibration_step_size
+  input_calibration_generic: !input input_calibration_generic
+  input_generic_calibration_offset: !input input_generic_calibration_offset
+
+  # Frostschutz
+  input_frost_protection_temp: !input input_frost_protection_temp
+  input_frost_protection_duration: !input input_frost_protection_duration
+
+  # Verkalkungsschutz
+  input_liming_protection: !input input_liming_protection
+  input_liming_protection_day: !input input_liming_protection_day
+  input_liming_protection_time: !input input_liming_protection_time
+  input_liming_protection_duration: !input input_liming_protection_duration
+  input_liming_in_winter: !input input_liming_in_winter
+
+  # Anpassungen
+  input_off_instead_of_eco: !input input_off_instead_of_eco
+  input_min_instead_of_off: !input input_min_instead_of_off
+  input_fahrenheit: !input input_fahrenheit
+  input_reset_temperature: !input input_reset_temperature
+  input_off_if_nobody_home: !input input_off_if_nobody_home
+  input_physical_change: !input input_physical_change
+
+  # Zustand des Wintermodus umkehren
+  input_winter_mode_inverted: "{{ iif(input_mode_winter != none and input_invert_winter_mode_value == true, true, false) }}"
+
+  # Fenster, die gerade lüften
+  windows_open_list: "{{ expand(input_windows) | selectattr('state', 'in', ['on', 'open']) | list }}"
+  is_window_open: "{{ windows_open_list | count > 0 }}"
+  is_multiple_windows_open: "{{ windows_open_list | count > 1 }}"
+
+  # Personenzustand
+  # Die Zustände werden auf 'home' (zuhause), 'just_arrived' (gerade angekommen) oder 'not_home' (nicht zuhause) abgebildet.
+  person_states: >
+    {% set p_states = namespace(persons = []) %}
+    {% for person in input_persons %}
+      {% if states(person) == 'home' %}
+        {% set p_states.persons = p_states.persons + ['home'] %}
+      {% else %}
+        {% set p_states.persons = p_states.persons + ['not_home'] %}
+      {% endif %}
+      {% if now() - as_datetime(states[person].last_changed) < input_people_entering_home_duration and states(person) == 'home' %}
+        {% set p_states.persons = p_states.persons + ['just_arrived'] %}
+      {% endif %}
+    {% endfor %}
+    {{ p_states.persons }}
+
+  # Anzahl der Personen zuhause
+  people_home_count: "{{ person_states | select('equalto', 'home') | list | count }}"
+  is_people_home: "{{ people_home_count > 0 }}"
+  is_someone_just_arrived: "{{ person_states | select('equalto', 'just_arrived') | list | count > 0 }}"
+
+  # Komfort-Temperatur (statisch oder Entität)
+  comfort_temp: >
+    {% set temp_value = state_attr(input_temperature_comfort, 'state') | default(states(input_temperature_comfort), true) | default(namespace(s = 0)) %}
+    {% if temp_value.s == 0 %}
+      {{ !input input_temperature_comfort_static | float }}
+    {% else %}
+      {{ temp_value | float }}
+    {% endif %}
+
+  # Eco-Temperatur (statisch oder Entität)
+  eco_temp: >
+    {% set temp_value = state_attr(input_temperature_eco, 'state') | default(states(input_temperature_eco), true) | default(namespace(s = 0)) %}
+    {% if temp_value.s == 0 %}
+      {{ !input input_temperature_eco_static | float }}
+    {% else %}
+      {{ temp_value | float }}
+    {% endif %}
+
+  # Prüfen, ob die Automation basierend auf Ein/Aus, Außentemperatur und Raumtemperatur aktiv ist
+  is_winter_mode_off: >
+    {% set winter_mode_state = states(input_mode_winter) | lower %}
+    {% if input_mode_winter == none %}
+      {% set result = false %}
+    {% elif input_winter_mode_inverted %}
+      {% set result = winter_mode_state in ['off', 'false', '0'] %}
+    {% else %}
+      {% set result = winter_mode_state in ['on', 'true', '1'] %}
+    {% endif %}
+    {{ result }}
+
+  is_outside_temp_below_threshold: >
+    {% if input_mode_outside_temperature == none %}
+      {% set result = true %}
+    {% else %}
+      {% set outside_temp = state_attr(input_mode_outside_temperature, 'temperature') | default(states(input_mode_outside_temperature), true) | float(-99) %}
+      {% set outside_threshold = input_mode_outside_temperature_threshold | float %}
+      {% if input_hvac_mode == 'cool' %}
+        {% set result = outside_temp >= outside_threshold %}
+      {% else %}
+        {% set result = outside_temp < outside_threshold %}
+      {% endif %}
+    {% endif %}
+    {{ result }}
+
+  is_room_temp_below_threshold: >
+    {% if input_mode_room_temperature == false or input_temperature_sensor == none %}
+      {% set result = true %}
+    {% else %}
+      {% set room_temp = states(input_temperature_sensor) | float(-99) %}
+      {% set room_threshold = input_mode_room_temperature_threshold | float %}
+      {% if input_hvac_mode == 'cool' %}
+        {% set result = room_temp >= room_threshold %}
+      {% else %}
+        {% set result = room_temp < room_threshold %}
+      {% endif %}
+    {% endif %}
+    {{ result }}
+
+  is_automation_on: "{{ is_winter_mode_off and is_outside_temp_below_threshold and is_room_temp_below_threshold }}"
+  is_automation_off: "{{ not is_automation_on }}"
+
+  # Heizplan-Aktivität
+  is_scheduler_active: >
+    {% set result = false %}
+    {% if input_schedulers == [] %}
+      {% set result = true %}
+    {% else %}
+      {% set selected_scheduler = namespace(name=none) %}
+
+      {% if input_scheduler_selector != none %}
+        {% set select_state = states(input_scheduler_selector) | string | lower %}
+        {% if select_state in ['on', 'true', '1'] %}
+          {% if input_schedulers | count > 1 %}
+            {% set selected_scheduler.name = state_attr(input_schedulers[1], 'friendly_name') %}
+          {% endif %}
+        {% elif select_state in ['off', 'false', '0'] %}
+          {% if input_schedulers | count > 0 %}
+            {% set selected_scheduler.name = state_attr(input_schedulers[0], 'friendly_name') %}
+          {% endif %}
+        {% elif select_state | float('no', 0) > 0 %}
+          {% set index = select_state | int - 1 %}
+          {% if input_schedulers | count > index %}
+            {% set selected_scheduler.name = state_attr(input_schedulers[index], 'friendly_name') %}
+          {% endif %}
+        {% else %}
+          {% for scheduler in input_schedulers %}
+            {% if state_attr(scheduler, 'friendly_name') | string | lower | find(select_state) != -1 %}
+              {% set selected_scheduler.name = state_attr(scheduler, 'friendly_name') %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endif %}
+      
+      {% for scheduler in input_schedulers %}
+        {% if (selected_scheduler.name == none or state_attr(scheduler, 'friendly_name') == selected_scheduler.name) and states(scheduler) == 'on' %}
+          {% set result = true %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {{ result }}
+
+  # Präsenz-Aktivität (Nur als Fallback beibehalten, da der dedizierte Sensor entfernt wurde)
+  is_presence_active: "{{ false }}"
+
+  # Proximity (Näherung) entfernt
+  is_proximity_active: "{{ false }}"
+
+  # Modus (comfort/eco/airing/off)
+  # Hier wird der Modus basierend auf allen Eingaben festgelegt
+  mode: >
+    {% set result = 'eco' %}
+    
+    {% if is_window_open %}
+      {% set result = 'airing' %}
+    {% endif %}
+
+    {% if result == 'eco' %}
+      {% if is_scheduler_active %}
+        {% set result = 'comfort' %}
+      {% endif %}
+    {% endif %}
+
+    # Personen-Logik
+    {% if is_person_defined and not is_people_home and result == 'comfort' %}
+      {% set result = 'eco' %}
+    {% endif %}
+    
+    {{ result }}
+
+  # Zieltemperatur
+  temp_target: >
+    {% set result = eco_temp | float %}
+
+    # Komfort-Modus
+    {% if mode == 'comfort' %}
+      {% set result = comfort_temp | float %}
+    # Lüften (airing)
+    {% elif mode == 'airing' %}
+      {% set result = input_window_open_temperature | float %}
+    # Eco-Modus
+    {% elif mode == 'eco' %}
+      {% set result = eco_temp | float %}
+    {% endif %}
+
+    # Aggressiver Modus
+    {% set thermostat = input_trvs | first | default(none) %}
+    {% if thermostat != none and mode == 'comfort' and input_aggressive_mode_range != 0 and input_aggressive_mode_offset != 0 and is_temperature_sensor_defined and input_aggressive_mode_calibration == false %}
+      {% set current_temp = states(input_temperature_sensor) | float(999) %}
+      {% set range = input_aggressive_mode_range | float %}
+      
+      {% if factor == 1 %}
+        # Heizen: Wenn Raumtemp unter unterem Bereich (Aggressiver Modus an)
+        {% if current_temp < result - range %}
+          {% set result = result + (input_aggressive_mode_offset | float * factor) %}
+        # Heizen: Wenn Raumtemp über oberem Bereich (Aggressiver Modus aus)
+        {% elif current_temp > result + range %}
+          {% set result = result - (input_aggressive_mode_offset | float * factor) %}
+        {% endif %}
+      {% else %}
+        # Kühlen: Wenn Raumtemp über oberem Bereich (Aggressiver Modus an)
+        {% if current_temp > result + range %}
+          {% set result = result + (input_aggressive_mode_offset | float * factor) %}
+        # Kühlen: Wenn Raumtemp unter unterem Bereich (Aggressiver Modus aus)
+        {% elif current_temp < result - range %}
+          {% set result = result - (input_aggressive_mode_offset | float * factor) %}
+        {% endif %}
+      {% endif %}
+    {% elif thermostat != none and mode == 'comfort' and input_aggressive_mode_range == 0 and input_aggressive_mode_offset != 0 and input_aggressive_mode_calibration == false %}
+      {% set result = result + (input_aggressive_mode_offset | float * factor) %}
+    {% endif %}
+
+    # Rundung und Minimaltemperatur
+    {% set result = (result * 2) | round / 2 %}
+    {% if result < 4.0 %}
+      {% set result = 4.0 %}
+    {% endif %}
+    {{ result }}
+
+  # HVAC-Modus
+  # Hier wird der HVAC-Modus basierend auf dem Ergebnis von 'mode' und 'temp_target' festgelegt.
+  hvac_mode: >
+    {% set mode_map = {'airing': 'off', 'eco': input_hvac_mode, 'comfort': input_hvac_mode} %}
+    {% set result = mode_map[mode] %}
+    
+    {% if mode == 'airing' and input_min_instead_of_off == true %}
+      {% set result = input_hvac_mode %}
+    {% elif mode == 'eco' and input_off_instead_of_eco == true %}
+      {% set result = 'off' %}
+    {% endif %}
+
+    # Wenn niemand zuhause ist
+    {% if is_person_defined and not is_people_home and input_off_if_nobody_home == true %}
+      {% set result = 'off' %}
+    {% endif %}
+
+    # Wenn Ziel-Temperatur außerhalb des Bereichs (nur für Kühlen/Heizen)
+    {% if is_temperature_sensor_defined and input_off_if_above_room_temperature == true and result != 'off' %}
+      {% set current_temp = states(input_temperature_sensor) | float(999) %}
+      {% if factor == 1 and temp_target <= current_temp %}
+        {% set result = 'off' %}
+      {% elif factor == -1 and temp_target >= current_temp %}
+        {% set result = 'off' %}
+      {% endif %}
+    {% endif %}
+
+    {{ result }}
+
+  # Frostschutz
+  is_frost_protection_active: >
+    {% set result = false %}
+    {% if temp_target < input_frost_protection_temp %}
+      {% set result = true %}
+    {% elif input_frost_protection_duration != none and is_person_defined and not is_people_home %}
+      {% set duration = input_frost_protection_duration.days | int * 86400 + input_frost_protection_duration.hours | int * 3600 + input_frost_protection_duration.minutes | int * 60 + input_frost_protection_duration.seconds | int %}
+      {% if duration > 0 and now() - as_datetime(states[input_persons | first].last_changed) > timedelta(seconds=duration) %}
+        {% set result = true %}
+      {% endif %}
+    {% endif %}
+    {{ result }}
+
+  temp_target_with_frost: "{{ iif(is_frost_protection_active and input_hvac_mode == 'heat', input_frost_protection_temp | float, temp_target | float) }}"
+
+  # Kalibrierung
+  # Prüft, ob Kalibrierung erlaubt ist
+  is_calibration_active: >
+    {% set is_active = true %}
+    {{ is_active and is_temperature_sensor_defined }}
+
+  # Hilfsvariablen
+  # Erforderlich für die Logik (Änderungen der Thermostate/Zustände)
+  current_trv_state: >
+    {% set trv_list = namespace(trv = []) %}
+    {% for thermostat in input_trvs %}
+      {% set trv_list.trv = trv_list.trv + [states(thermostat)] %}
+    {% endfor %}
+    {{ trv_list.trv }}
+
+  current_trv_attributes: >
+    {% set trv_list = namespace(trv = []) %}
+    {% for thermostat in input_trvs %}
+      {% set trv_list.trv = trv_list.trv + [state_attr(thermostat, 'temperature')] %}
+      {% set trv_list.trv = trv_list.trv + [state_attr(thermostat, 'hvac_mode')] %}
+    {% endfor %}
+    {{ trv_list.trv }}
+
+  # Alle Entitäten, deren Zustand eine Auslösung bewirken kann.
+  listen_entities: >
+    {{ input_trvs + input_persons + input_schedulers + input_windows + [input_mode_winter] + [input_mode_outside_temperature] + [input_temperature_comfort] + [input_temperature_eco] | reject('equalto', none) | list }}
+
+  # Alle Temperatursensoren, deren Zustand eine Auslösung bewirken kann.
+  listen_temp_entities: >
+    {{ [input_temperature_sensor] + input_trvs | reject('equalto', none) | list }}
+
+
+# Trigger
+
+trigger:
+  # 1. Start-Trigger
+  - platform: homeassistant
+    event: start
+    id: startup
+
+  # 2. Auslöser für Änderungen des Thermostat-Zustands
+  - platform: state
+    entity_id: "{{ input_trvs }}"
+    attribute: temperature
+    not_to:
+      - "{{ temp_target_with_frost }}"
+    id: trv_temp_change
+
+  # 3. Auslöser für Änderungen des HVAC-Modus des Thermostats
+  - platform: state
+    entity_id: "{{ input_trvs }}"
+    attribute: hvac_mode
+    not_to:
+      - "{{ hvac_mode }}"
+    id: trv_hvac_mode_change
+
+  # 4. Auslöser für Änderungen anderer relevanter Entitäten
+  - platform: state
+    entity_id: "{{ listen_entities }}"
+    id: other_entity_change
+
+  # 5. Auslöser für Änderungen des Temperatursensors (außer Thermostaten)
+  - platform: state
+    entity_id: "{{ listen_temp_entities }}"
+    id: temp_entity_change
+
+  # 6. Zeitgesteuerter Auslöser für Zeitplan-Anpassungen (jede Minute)
+  - platform: time_pattern
+    minutes: /1
+    id: time_change
+
+  # 7. Kalibrierungs-Timeout-Timer
+  - platform: state
+    entity_id: "{{ input_temperature_sensor }}"
+    for: !input input_calibration_timeout
+    id: calibration_timeout
+
+  # 8. Fenster-offen-Timeout-Timer
+  - platform: state
+    entity_id: "{{ input_windows }}"
+    to: "on"
+    for: !input input_windows_reaction_time_open
+    id: window_open_timeout
+
+  # 9. Fenster-geschlossen-Timeout-Timer
+  - platform: state
+    entity_id: "{{ input_windows }}"
+    to: "off"
+    for: !input input_windows_reaction_time_close
+    id: window_close_timeout
+
+  # 10. Verkalkungsschutz-Zeitplan-Auslöser
+  - platform: time
+    at: !input input_liming_protection_time
+    id: liming_time
+
+  # 11. Personen-Anwesenheits-Trigger
+  - platform: state
+    entity_id: !input input_persons
+    to: "home"
+    for: !input input_people_entering_home_duration
+    id: person_entering_home
+
+  # 12. Personen-Abwesenheits-Trigger
+  - platform: state
+    entity_id: !input input_persons
+    to: "not_home"
+    for: !input input_people_leaving_home_duration
+    id: person_leaving_home
+
+
+# Aktion
+action:
+  # Verkalkungsschutz-Logik
+  - if:
+      - condition: trigger
+        id: liming_time
+      - condition: template
+        value_template: "{{ now().strftime('%a') == input_liming_protection_day }}"
+      - condition: template
+        value_template: "{{ is_liming_protection_allowed }}"
+    then:
+      - service: logbook.log
+        data:
+          name: "AHC"
+          message: "🛠️ Verkalkungsschutz wird ausgeführt."
+          entity_id: "{{ this.entity_id }}"
+      - repeat:
+          for_each: "{{ input_trvs }}"
+          sequence:
+            # Stelle den Thermostat auf die maximale Temperatur ein, um das Ventil zu öffnen
+            - service: climate.set_temperature
+              data:
+                entity_id: "{{ repeat.item }}"
+                temperature: 30
+            # Setze den HVAC-Modus auf Heizen, falls er nicht bereits so eingestellt ist
+            - if:
+                - condition: template
+                  value_template: "{{ states(repeat.item) != 'heat' }}"
+              then:
+                - service: climate.set_hvac_mode
+                  data:
+                    entity_id: "{{ repeat.item }}"
+                    hvac_mode: heat
+      - delay:
+          minutes: !input input_liming_protection_duration
+      # Nach der Verzögerung auf die normale Temperatur und den Modus zurücksetzen (wird durch die normale Logik gehandhabt)
+      - service: homeassistant.update_entity
+        data:
+          entity_id: "{{ this.entity_id }}"
+      - stop: "Verkalkungsschutz abgeschlossen."
+
+  # Kalibrierungs-Logik
+  - if:
+      - condition: template
+        value_template: "{{ is_calibration_active }}"
+      - condition: template
+        # Überprüfe, ob eine Verzögerung aufgetreten ist oder ob dies ein Aktualisierungs-Trigger ist
+        value_template: "{{ trigger.id in ['calibration_timeout', 'other_entity_change', 'temp_entity_change', 'time_change', 'startup', 'trv_temp_change', 'trv_hvac_mode_change'] }}"
+    then:
+      - service: script.advanced_heating_control_calibration
+        data:
+          automation: "{{ this.entity_id }}"
+          trvs: !input input_trvs
+          temp_sensor: !input input_temperature_sensor
+          delta: !input input_calibration_delta
+          keyword: !input input_calibration_key_word
+          step_size: !input input_calibration_step_size
+          is_generic: !input input_calibration_generic
+          generic_offset: !input input_generic_calibration_offset
+          hvac_mode: !input input_hvac_mode
+          aggressive_mode_range: !input input_aggressive_mode_range
+          aggressive_mode_offset: !input input_aggressive_mode_offset
+          aggressive_mode_calibration: !input input_aggressive_mode_calibration
+      - stop: "Kalibrierungslogik ausgeführt."
+
+  # Automations-Ausschaltlogik
+  - if:
+      - condition: template
+        value_template: "{{ is_automation_off and trigger.id not in ['startup', 'liming_time'] }}"
+    then:
+      - service: logbook.log
+        data:
+          name: "AHC"
+          message: "Automation wurde deaktiviert. Setze HVAC-Modus auf 'off'."
+          entity_id: "{{ this.entity_id }}"
+      - repeat:
+          for_each: "{{ input_trvs }}"
+          sequence:
+            # Setze den HVAC-Modus auf 'off'
+            - if:
+                - condition: template
+                  value_template: "{{ states(repeat.item) != 'off' }}"
+              then:
+                - service: climate.set_hvac_mode
+                  data:
+                    entity_id: "{{ repeat.item }}"
+                    hvac_mode: off
+      - stop: "Automation deaktiviert."
+
+  # Fenster-Wiederherstellungs-Logik (Legacy)
+  - if:
+      - condition: template
+        value_template: "{{ trigger.id in ['window_close_timeout'] and input_window_legacy_restore == true }}"
+    then:
+      - service: logbook.log
+        data:
+          name: "AHC"
+          message: "Fenster geschlossen (Legacy-Wiederherstellung). Aktualisiere Entität."
+          entity_id: "{{ this.entity_id }}"
+      - service: homeassistant.update_entity
+        data:
+          entity_id: "{{ this.entity_id }}"
+      - stop: "Fenster-Wiederherstellung (Legacy) abgeschlossen."
+
+  # Logik für das Zurücksetzen von Helfern
+  - if:
+      - condition: template
+        value_template: "{{ input_reset_temperature == true }}"
+      - condition: template
+        # Wenn der Modus von comfort auf eco wechselt oder umgekehrt
+        value_template: "{{ trigger.id in ['person_leaving_home', 'person_entering_home'] }}"
+    then:
+      - if:
+          # Zurücksetzen auf statischen Komfortwert, wenn auf Eco gewechselt wird
+          - condition: template
+            value_template: "{{ mode == 'eco' and input_temperature_comfort != none }}"
+        then:
+          - service: input_number.set_value
+            data:
+              entity_id: !input input_temperature_comfort
+              value: !input input_temperature_comfort_static
+          - service: logbook.log
+            data:
+              name: "AHC"
+              message: "Helfer: {{ input_temperature_comfort }} auf statischen Wert zurückgesetzt."
+              entity_id: "{{ this.entity_id }}"
+      - if:
+          # Zurücksetzen auf statischen Eco-Wert, wenn auf Komfort gewechselt wird
+          - condition: template
+            value_template: "{{ mode == 'comfort' and input_temperature_eco != none }}"
+        then:
+          - service: input_number.set_value
+            data:
+              entity_id: !input input_temperature_eco
+              value: !input input_temperature_eco_static
+          - service: logbook.log
+            data:
+              name: "AHC"
+              message: "Helfer: {{ input_temperature_eco }} auf statischen Wert zurückgesetzt."
+              entity_id: "{{ this.entity_id }}"
+      - stop: "Helfer-Rücksetzlogik ausgeführt."
+
+  # Hauptlogik: Heizung steuern
+  - variables:
+      # Prüfen, ob Temperatur/Modus aufgrund von Änderungen geändert werden müssen (Änderungen der Thermostat-Attribute werden ignoriert)
+      changes_to_apply: >
+        {% set changes = namespace(trvs = []) %}
+        {% for thermostat in input_trvs %}
+          {% set current_temp = state_attr(thermostat, 'temperature') %}
+          {% set current_hvac_mode = states(thermostat) %}
+          
+          {% if current_hvac_mode != hvac_mode and not (current_hvac_mode == 'off' and hvac_mode == input_hvac_mode and input_min_instead_of_off == true and current_temp | float == 4.0 and mode == 'airing') %}
+            {% set changes.trvs = changes.trvs + [thermostat] %}
+          {% elif current_temp | float != temp_target_with_frost | float and hvac_mode != 'off' and not (current_temp | float == 4.0 and mode == 'airing') %}
+            {% set changes.trvs = changes.trvs + [thermostat] %}
+          {% endif %}
+        {% endfor %}
+        {{ changes.trvs | unique | list }}
+
+  - if:
+      - condition: template
+        value_template: "{{ changes_to_apply | count | int > 0 or is_scene_apply_trigger }}"
+    then:
+      # Protokollierung der Änderungen
+      - service: logbook.log
+        data:
+          name: "AHC"
+          message: "Modus: {{ mode }}, Zieltemperatur: {{ temp_target_with_frost }}, HVAC: {{ hvac_mode }}, Änderungen an {{ changes_to_apply | count }} Thermostaten."
+          entity_id: "{{ this.entity_id }}"
+
+      # Variablen für die Schleife festlegen
+      - variables:
+          mode: "{{ hvac_mode }}"
+          temp_target: "{{ temp_target_with_frost }}"
+          is_heating: "{{ temp_target_with_frost | float > 4.0 and mode != 'off' }}"
+
+      - repeat:
+          for_each: "{{ input_trvs }}"
+          sequence:
+            - variables:
+                thermostat: "{{ repeat.item }}"
+            
+            # Setze HVAC-Modus
+            - if:
+                - condition: template
+                  value_template: "{{ states(thermostat) | lower != mode | lower  }}"
+              then:
+                - action: climate.set_hvac_mode
+                  data:
+                    entity_id: "{{ thermostat }}"
+                    hvac_mode: "{{ mode }}"
+
+            # Setze Temperatur
+            - if:
+                - condition: template
+                  value_template: "{{ state_attr(thermostat, 'temperature') != temp_target and mode != 'off' }}"
+              then:
+                - action: climate.set_temperature
+                  data:
+                    entity_id: "{{ thermostat }}"
+                    temperature: "{{ temp_target | float }}"
+
+mode: queued
