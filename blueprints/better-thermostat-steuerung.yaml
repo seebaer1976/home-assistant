@@ -1,5 +1,5 @@
 blueprint:
-  name: Klima-Planungsmodul für Better Thermostat
+  name: Better Thermostat Steuerung
   author: d187
   homeassistant:
     min_version: "2024.10.0"
@@ -23,11 +23,7 @@ blueprint:
 
 
     **Ziel-Entität**: **Ihre Better Thermostat (BT) Klima-Entität.**
-
-    **Version**: 5.3.4 (BT-Companion - final)
-
-    **Hilfe & FAQ**: [Advanced Heating Control](https://community.home-assistant.io/t/advanced-heating-control/469873)
-  source_url: https://github.com/panhans/HomeAssistant/blob/main/blueprints/automation/panhans/klima_planungsmodul_fuer_better_thermostat.yaml
+  source_url: https://github.com/seebaer1976/home-assistant/blob/main/blueprints/trhs-steuerung.yaml
   domain: automation
   input:
     thermostat_section:
@@ -597,7 +593,7 @@ action:
     then:
       - service: logbook.log
         data:
-          name: "Klima-Planungsmodul"
+          name: "Klima-Steuerung"
           message: "Automation wurde deaktiviert. Setze BT-HVAC-Modus auf 'off'."
           entity_id: "{{ this.entity_id }}"
       - repeat:
@@ -637,7 +633,7 @@ action:
       # Protokollierung der Änderungen
       - service: logbook.log
         data:
-          name: "Klima-Planungsmodul"
+          name: "Klima-Steuerung"
           message: "Modus: {{ mode }}, Zieltemperatur: {{ temp_target_with_frost }}, HVAC: {{ hvac_mode }}, Änderungen an {{ changes_to_apply | count }} BT-Entitäten."
           entity_id: "{{ this.entity_id }}"
 
