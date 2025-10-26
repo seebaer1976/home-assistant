@@ -435,7 +435,7 @@ action:
                 - condition: template
                   value_template: "{{ states(thermostat) | lower != mode | lower  }}"
               then:
-                - action: climate.set_hvac_mode
+                - service: climate.set_hvac_mode # <-- KORRIGIERT
                   data:
                     entity_id: "{{ thermostat }}"
                     hvac_mode: "{{ mode }}"
@@ -445,7 +445,7 @@ action:
                 - condition: template
                   value_template: "{{ state_attr(thermostat, 'temperature') != temp_target and mode != 'off' }}"
               then:
-                - action: climate.set_temperature
+                - service: climate.set_temperature # <-- KORRIGIERT
                   data:
                     entity_id: "{{ thermostat }}"
                     temperature: "{{ temp_target | float }}"
