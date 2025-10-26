@@ -1,14 +1,16 @@
 blueprint:
-  name: Erweiterte Heizungssteuerung V5 (BT Companion)
+  name: Erweiterte Heizungssteuerung V5 (BT Companion - Minimal)
   author: panhans
   homeassistant:
     min_version: "2024.10.0"
   description: >
-    🔥 Stark vereinfachte Version der erweiterten Heizungssteuerung V5,
-    speziell entwickelt, um **Better Thermostat (BT)** zu steuern.
+    🔥 Die minimalistischste Version der erweiterten Heizungssteuerung V5.
     
-    AHC übernimmt die übergeordnete Logik (Zeitpläne und Anwesenheit),
-    während BT die Kalibrierung, Fenstererkennung und TRV-Steuerung übernimmt.
+    AHC dient ausschließlich als übergeordnete Logik-Ebene, die die **Ziel-Temperatur**
+    und den **HVAC-Modus** (heat/cool/auto oder off) basierend auf Anwesenheit und Zeitplänen
+    an die Better Thermostat (BT) Entität(en) übergibt.
+    
+    Alle weiteren Steuerungs- und Optimierungsfunktionen werden von Better Thermostat übernommen.
 
 
     > Kernfunktionen:
@@ -21,15 +23,13 @@ blueprint:
 
     Aktivierung basierend auf Wetter/Temperatur
 
-    Einfache Temperatur-Optimierungen
-
 
     **Ziel-Entität**: **Ihre Better Thermostat (BT) Klima-Entität.**
 
-    **Version**: 5.3.4 (BT-Companion - stark reduziert)
+    **Version**: 5.3.4 (BT-Companion - minimal)
 
     **Hilfe & FAQ**: [Advanced Heating Control](https://community.home-assistant.io/t/advanced-heating-control/469873)
-  source_url: https://github.com/panhans/HomeAssistant/blob/main/blueprints/automation/panhans/advanced_heating_control_bt_companion.yaml
+  source_url: https://github.com/panhans/HomeAssistant/blob/main/blueprints/automation/panhans/advanced_heating_control_bt_companion_minimal.yaml
   domain: automation
   input:
     thermostat_section:
@@ -61,9 +61,9 @@ blueprint:
                 - heat_cool
 
         input_temperature_sensor:
-          name: Raumtemperatursensor (Optional)
+          name: Raumtemperatursensor (Nur für globale Aktivierung)
           description: >
-            Wird nur für die Logik *Aus bei Über-/Unterschreitung der Raumtemperatur* verwendet. BT nutzt seinen eigenen Sensor für die Steuerung.
+            Wird nur für die Logik der **globalen Aktivierung** in Kombination mit dem *Raumtemperatur-Schwellenwert* verwendet.
           default: []
           selector:
             entity:
@@ -128,43 +128,6 @@ blueprint:
                 - domain:
                     - input_number
               multiple: false
-
-    temperature_tweak_section:
-      name: Einfache Temperatur-Optimierungen
-      icon: mdi:knob
-      collapsed: true
-      input:
-        input_fahrenheit:
-          name: Fahrenheit
-          description: >
-            Aktivieren, wenn Ihre Maßeinheit Fahrenheit ist (ungetestet).
-          default: false
-          selector:
-            boolean:
-
-        input_reset_temperature:
-          name: Temperatur zurücksetzen (Helfer)
-          description: >
-            Setzt Ihre Temperatur-Entitäten (Helfer) auf die statischen Temperaturwerte zurück, nachdem Zeitplan oder Personen enden.
-          default: false
-          selector:
-            boolean:
-
-        input_off_if_above_room_temperature:
-          name: Aus bei Über-/Unterschreitung der Raumtemperatur
-          description: >
-            Schaltet die BT-Entität *aus*, wenn die Ziel-Temperatur unter (Kühlen) / über (Heizen) der Raumtemperatur liegt. (Benötigt `Raumtemperatursensor`)
-          default: false
-          selector:
-            boolean:
-
-        input_off_if_nobody_home:
-          name: Aus, wenn niemand zuhause ist
-          description: >
-            Schaltet die BT-Entität *aus*, wenn Personen definiert sind und niemand zuhause ist.
-          default: false
-          selector:
-            boolean:
 
     person_section:
       name: Personen
@@ -327,7 +290,7 @@ blueprint:
         input_mode_room_temperature:
           name: Raumtemperatur-Schwellenwert aktivieren
           description: >
-            Aktiviert die Prüfung, ob auch die Raumtemperatur unter/über ihrem Schwellenwert liegt.
+            Aktiviert die Prüfung, ob auch die Raumtemperatur unter/über ihrem Schwellenwert liegt. (Benötigt `Raumtemperatursensor`)
           default: false
           selector:
             boolean:
@@ -367,9 +330,7 @@ variables:
   input_temperature_comfort: !input input_temperature_comfort
   input_temperature_eco: !input input_temperature_eco
   input_hvac_mode: !input input_hvac_mode
-  # Faktor ist 1 für Heizen und -1 für Kühlen
   factor: "{{ iif(input_hvac_mode == 'cool', -1, 1) | int }}"
-  input_off_if_above_room_temperature: !input input_off_if_above_room_temperature
 
   # Ein/Aus
   input_mode_winter: !input input_mode_winter
@@ -383,16 +344,8 @@ variables:
   input_frost_protection_temp: !input input_frost_protection_temp
   input_frost_protection_duration: !input input_frost_protection_duration
 
-  # Anpassungen
-  input_fahrenheit: !input input_fahrenheit
-  input_reset_temperature: !input input_reset_temperature
-  input_off_if_nobody_home: !input input_off_if_nobody_home
-
   # Zustand des Wintermodus umkehren
   input_winter_mode_inverted: "{{ iif(input_mode_winter != none and input_invert_winter_mode_value == true, true, false) }}"
-
-  # Fenster (Logik entfernt, nur als Dummy-Variable beibehalten, falls AHC-Logik sie intern noch nutzt)
-  is_window_open: "{{ false }}"
 
   # Personenzustand
   person_states: >
@@ -517,7 +470,7 @@ variables:
     {% endif %}
     {{ result }}
 
-  # Modus (comfort/eco/off)
+  # Modus (comfort/eco)
   mode: >
     {% set result = 'eco' %}
     
@@ -552,28 +505,11 @@ variables:
     {{ result }}
 
   # HVAC-Modus
+  # AHC setzt den HVAC-Modus nur auf 'off' im Falle eines globalen Ausschalters.
+  # Ansonsten wird der definierte HVAC-Modus (z.B. heat) verwendet, da BT die Detailsteuerung übernimmt.
   hvac_mode: >
     {% set mode_map = {'eco': input_hvac_mode, 'comfort': input_hvac_mode} %}
     {% set result = mode_map[mode] %}
-    
-    # Wenn niemand zuhause ist
-    {% if is_person_defined and not is_people_home and input_off_if_nobody_home == true %}
-      {% set result = 'off' %}
-    {% endif %}
-
-    # Wenn Ziel-Temperatur außerhalb des Bereichs (nur für Kühlen/Heizen)
-    {% if is_temperature_sensor_defined and input_off_if_above_room_temperature == true and result != 'off' %}
-      {% set current_temp = states(input_temperature_sensor) | float(999) %}
-      {% if factor == 1 and temp_target <= current_temp %}
-        {% set result = 'off' %}
-      {% elif factor == -1 and temp_target >= current_temp %}
-        {% set result = 'off' %}
-      {% endif %}
-    {% endif %}
-
-    # Für Better Thermostat kann AHC den HVAC-Modus nur auf 'off' setzen, wenn die Automation pausiert oder die 'off_if' Bedingungen zutreffen.
-    # Ansonsten sollte der Modus immer 'input_hvac_mode' (z.B. heat) sein, um die volle Kontrolle durch BT zu gewährleisten.
-
     {{ result }}
 
   # Frostschutz
@@ -679,43 +615,6 @@ action:
                     entity_id: "{{ repeat.item }}"
                     hvac_mode: off
       - stop: "Automation deaktiviert."
-
-  # Logik für das Zurücksetzen von Helfern
-  - if:
-      - condition: template
-        value_template: "{{ input_reset_temperature == true }}"
-      - condition: template
-        value_template: "{{ trigger.id in ['person_leaving_home', 'person_entering_home'] }}"
-    then:
-      - if:
-          # Zurücksetzen auf statischen Komfortwert, wenn auf Eco gewechselt wird
-          - condition: template
-            value_template: "{{ mode == 'eco' and input_temperature_comfort != none }}"
-        then:
-          - service: input_number.set_value
-            data:
-              entity_id: !input input_temperature_comfort
-              value: !input input_temperature_comfort_static
-          - service: logbook.log
-            data:
-              name: "AHC (BT Companion)"
-              message: "Helfer: {{ input_temperature_comfort }} auf statischen Wert zurückgesetzt."
-              entity_id: "{{ this.entity_id }}"
-      - if:
-          # Zurücksetzen auf statischen Eco-Wert, wenn auf Komfort gewechselt wird
-          - condition: template
-            value_template: "{{ mode == 'comfort' and input_temperature_eco != none }}"
-        then:
-          - service: input_number.set_value
-            data:
-              entity_id: !input input_temperature_eco
-              value: !input input_temperature_eco_static
-          - service: logbook.log
-            data:
-              name: "AHC (BT Companion)"
-              message: "Helfer: {{ input_temperature_eco }} auf statischen Wert zurückgesetzt."
-              entity_id: "{{ this.entity_id }}"
-      - stop: "Helfer-Rücksetzlogik ausgeführt."
 
   # Hauptlogik: BT-Entität steuern
   - variables:
