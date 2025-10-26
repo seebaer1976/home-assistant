@@ -17,7 +17,7 @@ blueprint:
 
     Zeitpläne (Scheduler)
 
-    Frostschutz (Abwesenheit)
+    Frostschutz
 
     Aktivierung basierend auf Wetter/Temperatur
 
@@ -26,7 +26,7 @@ blueprint:
   source_url: https://github.com/seebaer1976/home-assistant/blob/main/blueprints/trhs-steuerung.yaml
   domain: automation
   
-  # NEUE STRUKTUR STARTET HIER
+  # NEUE STRUKTUR
   input:
     thermostat_section:
       name: 🔥 Thermostat & HVAC-Modus
@@ -62,7 +62,7 @@ blueprint:
       collapsed: false
       input:
         input_temperature_comfort_static:
-          name: ☀️ Komfort-Temperatur (Statisch)
+          name: ☀️ Ziel-Temperatur (Statisch)
           description: >
             Die Ziel-Temperatur für den Komfort-Modus (Heizplan aktiv / Zuhause).
           default: 22
@@ -77,7 +77,7 @@ blueprint:
         input_temperature_eco_static:
           name: 🌙 Eco-Temperatur (Statisch)
           description: >
-            Die Temperatur, die eingestellt wird, wenn der Komfort-Modus nicht aktiv ist.
+            Die Temperatur, die eingestellt wird, wenn der Komfort-Modus nicht aktiv ist (z.B. nachts oder bei Abwesenheit).
           default: 19
           selector:
             number:
@@ -90,7 +90,7 @@ blueprint:
         input_frost_protection_temp:
           name: ❄️ Frostschutz-Temperatur
           description: >
-            Temperatur, die eingestellt wird, wenn der Frostschutz aktiv ist (z.B. nach langer Abwesenheit).
+            Temperatur, die eingestellt wird, wenn die Ziel-Temperatur niedriger als dieser Wert ist.
           default: 5
           selector:
             number:
@@ -102,7 +102,7 @@ blueprint:
 
         # Optionale Entitäten für dynamische Temperaturen
         input_temperature_comfort:
-          name: Komfort-Temperatur (Entität)
+          name: Ziel-Temperatur (Entität)
           description: >
             (Optional) Entität (z.B. `input_number`) zur dynamischen Steuerung der Ziel-Temperatur.
           default: []
@@ -134,7 +134,7 @@ blueprint:
         input_schedulers:
           name: 🗓️ Zeitpläne (Schedule Entitäten)
           description: >
-            Ein [Zeitplan](https://www.home-assistant.io/integrations/schedule/) legt fest, wann auf Komfort-Temperatur geheizt werden soll.
+            Ein [Zeitplan](https://www.home-assistant.io/integrations/schedule/) legt fest, wann auf Ziel-Temperatur geheizt werden soll.
           default: []
           selector:
             entity:
@@ -142,26 +142,12 @@ blueprint:
                 - domain:
                     - schedule
               multiple: true
-
-        input_scheduler_selector:
-          name: 🎛️ Zeitplan-Umschalter
-          description: >
-            (Optional) Definiert eine Entität zur Auswahl oder Aktivierung/Deaktivierung spezifischer Zeitpläne.
-          default:
-          selector:
-            entity:
-              filter:
-                - domain:
-                    - input_boolean
-                    - binary_sensor
-                    - input_select
-              multiple: false
               
         # Personen
         input_persons:
-          name: 👥 Personen
+          name: 👥 Abwesenheit-Personen
           description: >
-            [Personen](https://www.home-assistant.io/integrations/person/) angeben, um den Heizplan dynamisch zu steuern (z.B. Abwesenheit = Eco/Frostschutz).
+            [Personen](https://www.home-assistant.io/integrations/person/) angeben. Wenn alle Personen **abwesend** sind, wird auf Eco-Temperatur umgeschaltet.
           default: []
           selector:
             entity:
@@ -184,27 +170,13 @@ blueprint:
         input_people_leaving_home_duration:
           name: Abwesenheits-Verzögerung
           description: >
-            Dauer, die jemand abwesend sein muss, bevor auf Eco/Frostschutz umgeschaltet wird.
+            Dauer, die jemand abwesend sein muss, bevor auf Eco-Temperatur umgeschaltet wird.
           default:
             hours: 0
             minutes: 0
             seconds: 2
           selector:
             duration:
-
-        input_frost_protection_duration:
-          name: Frostschutz-Verzögerung (Abwesenheit)
-          description: >
-            Wenn Personen länger als diese Dauer abwesend sind, wird die Frostschutz-Temperatur eingestellt.
-            *Hinweis: Bei 0 bleibt es bei Eco-Temperatur.*
-          default:
-            days: 0
-            hours: 0
-            minutes: 0
-            seconds: 0
-          selector:
-            duration:
-              enable_day: true
 
     toggle_section:
       name: ⚙️ Globale Ein-/Ausschalt-Optionen
@@ -223,14 +195,6 @@ blueprint:
                     - input_boolean
                     - binary_sensor
               multiple: false
-
-        input_invert_winter_mode_value:
-          name: Wert des Umschalters umkehren
-          description: >
-            Kehrt den Wert der binären Entität um (z.B. *Aus* bedeutet aktiv).
-          default: off
-          selector:
-            boolean:
 
         # Außentemperatur-Logik
         input_mode_outside_temperature:
@@ -313,7 +277,7 @@ variables:
 
   # Zeitplaner
   input_schedulers: !input input_schedulers
-  input_scheduler_selector: !input input_scheduler_selector
+  # input_scheduler_selector entfernt
 
   # Temperaturen
   input_temperature_comfort: !input input_temperature_comfort
@@ -323,7 +287,7 @@ variables:
 
   # Ein/Aus
   input_mode_winter: !input input_mode_winter
-  input_invert_winter_mode_value: !input input_invert_winter_mode_value
+  # input_invert_winter_mode_value entfernt
   input_mode_outside_temperature: !input input_mode_outside_temperature
   input_mode_outside_temperature_threshold: !input input_mode_outside_temperature_threshold
   input_mode_room_temperature: !input input_mode_room_temperature
@@ -331,10 +295,16 @@ variables:
 
   # Frostschutz
   input_frost_protection_temp: !input input_frost_protection_temp
-  input_frost_protection_duration: !input input_frost_protection_duration
+  # input_frost_protection_duration entfernt
 
-  # Zustand des Wintermodus umkehren
-  input_winter_mode_inverted: "{{ iif(input_mode_winter != none and input_invert_winter_mode_value == true, true, false) }}"
+  # Zustand des Master-Schalters
+  is_master_switch_active: >
+    {% if input_mode_winter == none %}
+      {% set result = true %}
+    {% else %}
+      {% set result = states(input_mode_winter) | lower in ['on', 'true', '1'] %}
+    {% endif %}
+    {{ result }}
 
   # Personenzustand
   person_states: >
@@ -374,18 +344,7 @@ variables:
       {{ temp_value | float }}
     {% endif %}
 
-  # Prüfen, ob die Automation basierend auf Ein/Aus, Außentemperatur und Raumtemperatur aktiv ist
-  is_winter_mode_off: >
-    {% set winter_mode_state = states(input_mode_winter) | lower %}
-    {% if input_mode_winter == none %}
-      {% set result = false %}
-    {% elif input_winter_mode_inverted %}
-      {% set result = winter_mode_state in ['off', 'false', '0'] %}
-    {% else %}
-      {% set result = winter_mode_state in ['on', 'true', '1'] %}
-    {% endif %}
-    {{ result }}
-
+  # Prüfen, ob die Automation basierend auf Master-Schalter, Außentemperatur und Raumtemperatur aktiv ist
   is_outside_temp_below_threshold: >
     {% if input_mode_outside_temperature == none %}
       {% set result = true %}
@@ -414,44 +373,17 @@ variables:
     {% endif %}
     {{ result }}
 
-  is_automation_on: "{{ is_winter_mode_off and is_outside_temp_below_threshold and is_room_temp_below_threshold }}"
+  is_automation_on: "{{ is_master_switch_active and is_outside_temp_below_threshold and is_room_temp_below_threshold }}"
   is_automation_off: "{{ not is_automation_on }}"
 
-  # Heizplan-Aktivität
+  # Heizplan-Aktivität (vereinfacht)
   is_scheduler_active: >
     {% set result = false %}
     {% if input_schedulers == [] %}
       {% set result = true %}
     {% else %}
-      {% set selected_scheduler = namespace(name=none) %}
-
-      {% if input_scheduler_selector != none %}
-        {% set select_state = states(input_scheduler_selector) | string | lower %}
-        {% if select_state in ['on', 'true', '1'] %}
-          {% if input_schedulers | count > 1 %}
-            {% set selected_scheduler.name = state_attr(input_schedulers[1], 'friendly_name') %}
-          {% endif %}
-        {% elif select_state in ['off', 'false', '0'] %}
-          {% if input_schedulers | count > 0 %}
-            {% set selected_scheduler.name = state_attr(input_schedulers[0], 'friendly_name') %}
-          {% endif %}
-        {% elif select_state | float('no', 0) > 0 %}
-          {% set index = select_state | int - 1 %}
-          {% if input_schedulers | count > index %}
-            {% set selected_scheduler.name = state_attr(input_schedulers[index], 'friendly_name') %}
-          {% endif %}
-        {% else %}
-          {% for scheduler in input_schedulers %}
-            {% if state_attr(scheduler, 'friendly_name') | string | lower | find(select_state) != -1 %}
-              {% set selected_scheduler.name = state_attr(scheduler, 'friendly_name') %}
-              {% break %}
-            {% endif %}
-          {% endfor %}
-        {% endif %}
-      {% endif %}
-      
       {% for scheduler in input_schedulers %}
-        {% if (selected_scheduler.name == none or state_attr(scheduler, 'friendly_name') == selected_scheduler.name) and states(scheduler) == 'on' %}
+        {% if states(scheduler) == 'on' %}
           {% set result = true %}
           {% break %}
         {% endif %}
@@ -467,7 +399,7 @@ variables:
       {% set result = 'comfort' %}
     {% endif %}
 
-    # Personen-Logik
+    # Abwesenheit-Logik
     {% if is_person_defined and not is_people_home and result == 'comfort' %}
       {% set result = 'eco' %}
     {% endif %}
@@ -494,23 +426,16 @@ variables:
     {{ result }}
 
   # HVAC-Modus
-  # Das Modul setzt den HVAC-Modus nur auf 'off' im Falle eines globalen Ausschalters.
-  # Ansonsten wird der definierte HVAC-Modus (z.B. heat) verwendet, da BT die Detailsteuerung übernimmt.
   hvac_mode: >
     {% set mode_map = {'eco': input_hvac_mode, 'comfort': input_hvac_mode} %}
     {% set result = mode_map[mode] %}
     {{ result }}
 
-  # Frostschutz
+  # Frostschutz (vereinfacht)
   is_frost_protection_active: >
     {% set result = false %}
     {% if temp_target < input_frost_protection_temp %}
       {% set result = true %}
-    {% elif input_frost_protection_duration != none and is_person_defined and not is_people_home %}
-      {% set duration = input_frost_protection_duration.days | int * 86400 + input_frost_protection_duration.hours | int * 3600 + input_frost_protection_duration.minutes | int * 60 + input_frost_protection_duration.seconds | int %}
-      {% if duration > 0 and now() - as_datetime(states[input_persons | first].last_changed) > timedelta(seconds=duration) %}
-        {% set result = true %}
-      {% endif %}
     {% endif %}
     {{ result }}
 
