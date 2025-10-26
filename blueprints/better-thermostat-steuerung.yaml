@@ -13,13 +13,17 @@ blueprint:
 
     > Kernfunktionen:
 
-    Anwesenheit von Personen
+    **Ziel-Temperatur** (Eco vs. Ziel) basierend auf Zeitplänen.
 
-    Zeitpläne (Scheduler)
+    **Umschaltung auf Eco** bei Abwesenheit von Personen.
 
-    Frostschutz
+    **Frostschutz** als Mindesttemperatur-Override.
 
-    Aktivierung basierend auf Wetter/Temperatur
+    
+    **WICHTIGER HINWEIS:**
+    Globale Steuerungsparameter (Master-Schalter, Mindest-Außentemperatur, Mindest-Raumtemperatur)
+    sollten in der **Better Thermostat Integration** selbst konfiguriert werden,
+    da diese dort intelligenter verarbeitet werden.
 
 
     **Ziel-Entität**: **Ihre Better Thermostat (BT) Klima-Entität.**
@@ -90,7 +94,7 @@ blueprint:
         input_frost_protection_temp:
           name: ❄️ Frostschutz-Temperatur
           description: >
-            Temperatur, die eingestellt wird, wenn die Ziel-Temperatur niedriger als dieser Wert ist.
+            Temperatur, die eingestellt wird, wenn die errechnete Ziel-Temperatur niedriger als dieser Wert ist.
           default: 5
           selector:
             number:
@@ -128,7 +132,7 @@ blueprint:
     logic_section:
       name: 👤 Zeit- & Anwesenheitslogik
       icon: mdi:account-clock
-      collapsed: true
+      collapsed: false
       input:
         # Zeitplanung
         input_schedulers:
@@ -159,7 +163,7 @@ blueprint:
         input_people_entering_home_duration:
           name: Ankunfts-Verzögerung
           description: >
-            Dauer, die jemand zuhause sein muss, bevor der Komfort-Modus aktiv wird.
+            Dauer, die jemand zuhause sein muss, bevor der Ziel-Modus aktiv wird.
           default:
             hours: 0
             minutes: 0
@@ -178,94 +182,12 @@ blueprint:
           selector:
             duration:
 
-    toggle_section:
-      name: ⚙️ Globale Ein-/Ausschalt-Optionen
-      icon: mdi:light-switch
-      collapsed: true
-      input:
-        input_mode_winter:
-          name: Wintermodus / Master-Umschalter
-          description: >
-            (Optional) Wenn *aus*, wird die gesamte Automation deaktiviert und alle BT-Entitäten auf *off* gesetzt.
-          default:
-          selector:
-            entity:
-              filter:
-                - domain:
-                    - input_boolean
-                    - binary_sensor
-              multiple: false
-
-        # Außentemperatur-Logik
-        input_mode_outside_temperature:
-          name: Außentemperatur-Sensor
-          description: >
-            (Optional) Steuert die Heizung nur, wenn die Außentemperatur unter dem Schwellenwert liegt.
-          default:
-          selector:
-            entity:
-              filter:
-                - domain:
-                    - weather
-                - domain:
-                    - sensor
-                  device_class: temperature
-              multiple: false
-
-        input_mode_outside_temperature_threshold:
-          name: Außentemperatur-Schwellenwert
-          description: >
-            Fällt die Außentemperatur unter diesen Schwellenwert, wird die Heizung aktiviert.
-          default: 15
-          selector:
-            number:
-              min: 5
-              max: 68
-              step: 0.5
-              mode: box
-              unit_of_measurement: °C / °F
-
-        # Raumtemperatur-Logik
-        input_temperature_sensor:
-          name: Raumtemperatursensor (Für globale Aktivierung)
-          description: >
-            (Optional) Ein Raumtemperatursensor, der für die globale Aktivierungslogik verwendet wird.
-          default: []
-          selector:
-            entity:
-              filter:
-                - domain:
-                    - sensor
-                  device_class:
-                    - temperature
-              multiple: false
-
-        input_mode_room_temperature:
-          name: Raumtemperatur-Schwellenwert aktivieren
-          description: >
-            Aktiviert die Prüfung, ob auch die Raumtemperatur unter/über ihrem Schwellenwert liegt (Benötigt `Raumtemperatursensor`).
-          default: false
-          selector:
-            boolean:
-
-        input_mode_room_temperature_threshold:
-          name: Raumtemperatur-Schwellenwert
-          description: >
-            Schwellenwert für Ihren Raumtemperatursensor.
-          default: 18
-          selector:
-            number:
-              min: 5
-              max: 68
-              step: 0.5
-              mode: box
-              unit_of_measurement: °C / °F
+    # Globale Ein-/Ausschalt-Optionen (ENTFERNT)
 
 variables:
   # Thermostate / Sensoren
   input_trvs: !input input_trvs
-  input_temperature_sensor: !input input_temperature_sensor
-  is_temperature_sensor_defined: "{{ input_temperature_sensor != [] }}"
+  # input_temperature_sensor entfernt (da nur für Globale Steuerung)
 
   # Personen
   input_persons: !input input_persons
@@ -277,7 +199,6 @@ variables:
 
   # Zeitplaner
   input_schedulers: !input input_schedulers
-  # input_scheduler_selector entfernt
 
   # Temperaturen
   input_temperature_comfort: !input input_temperature_comfort
@@ -285,26 +206,8 @@ variables:
   input_hvac_mode: !input input_hvac_mode
   factor: "{{ iif(input_hvac_mode == 'cool', -1, 1) | int }}"
 
-  # Ein/Aus
-  input_mode_winter: !input input_mode_winter
-  # input_invert_winter_mode_value entfernt
-  input_mode_outside_temperature: !input input_mode_outside_temperature
-  input_mode_outside_temperature_threshold: !input input_mode_outside_temperature_threshold
-  input_mode_room_temperature: !input input_mode_room_temperature
-  input_mode_room_temperature_threshold: !input input_mode_room_temperature_threshold
-
   # Frostschutz
   input_frost_protection_temp: !input input_frost_protection_temp
-  # input_frost_protection_duration entfernt
-
-  # Zustand des Master-Schalters
-  is_master_switch_active: >
-    {% if input_mode_winter == none %}
-      {% set result = true %}
-    {% else %}
-      {% set result = states(input_mode_winter) | lower in ['on', 'true', '1'] %}
-    {% endif %}
-    {{ result }}
 
   # Personenzustand
   person_states: >
@@ -344,39 +247,7 @@ variables:
       {{ temp_value | float }}
     {% endif %}
 
-  # Prüfen, ob die Automation basierend auf Master-Schalter, Außentemperatur und Raumtemperatur aktiv ist
-  is_outside_temp_below_threshold: >
-    {% if input_mode_outside_temperature == none %}
-      {% set result = true %}
-    {% else %}
-      {% set outside_temp = state_attr(input_mode_outside_temperature, 'temperature') | default(states(input_mode_outside_temperature), true) | float(-99) %}
-      {% set outside_threshold = input_mode_outside_temperature_threshold | float %}
-      {% if input_hvac_mode == 'cool' %}
-        {% set result = outside_temp >= outside_threshold %}
-      {% else %}
-        {% set result = outside_temp < outside_threshold %}
-      {% endif %}
-    {% endif %}
-    {{ result }}
-
-  is_room_temp_below_threshold: >
-    {% if input_mode_room_temperature == false or input_temperature_sensor == none %}
-      {% set result = true %}
-    {% else %}
-      {% set room_temp = states(input_temperature_sensor) | float(-99) %}
-      {% set room_threshold = input_mode_room_temperature_threshold | float %}
-      {% if input_hvac_mode == 'cool' %}
-        {% set result = room_temp >= room_threshold %}
-      {% else %}
-        {% set result = room_temp < room_threshold %}
-      {% endif %}
-    {% endif %}
-    {{ result }}
-
-  is_automation_on: "{{ is_master_switch_active and is_outside_temp_below_threshold and is_room_temp_below_threshold }}"
-  is_automation_off: "{{ not is_automation_on }}"
-
-  # Heizplan-Aktivität (vereinfacht)
+  # Heizplan-Aktivität
   is_scheduler_active: >
     {% set result = false %}
     {% if input_schedulers == [] %}
@@ -431,7 +302,7 @@ variables:
     {% set result = mode_map[mode] %}
     {{ result }}
 
-  # Frostschutz (vereinfacht)
+  # Frostschutz
   is_frost_protection_active: >
     {% set result = false %}
     {% if temp_target < input_frost_protection_temp %}
@@ -443,11 +314,11 @@ variables:
 
   # Alle Entitäten, deren Zustand eine Auslösung bewirken kann.
   listen_entities: >
-    {{ input_trvs + input_persons + input_schedulers + [input_mode_winter] + [input_mode_outside_temperature] + [input_temperature_comfort] + [input_temperature_eco] | reject('equalto', none) | list }}
+    {{ input_trvs + input_persons + input_schedulers + [input_temperature_comfort] + [input_temperature_eco] | reject('equalto', none) | list }}
 
   # Alle Temperatursensoren, deren Zustand eine Auslösung bewirken kann.
   listen_temp_entities: >
-    {{ [input_temperature_sensor] + input_trvs | reject('equalto', none) | list }}
+    {{ input_trvs | reject('equalto', none) | list }}
 
 
 # Trigger
@@ -479,7 +350,7 @@ trigger:
     entity_id: "{{ listen_entities }}"
     id: other_entity_change
 
-  # 5. Auslöser für Änderungen des Temperatursensors
+  # 5. Auslöser für Änderungen des Temperatursensors (nur BT-Sensor)
   - platform: state
     entity_id: "{{ listen_temp_entities }}"
     id: temp_entity_change
@@ -506,30 +377,6 @@ trigger:
 
 # Aktion
 action:
-  # Automations-Ausschaltlogik
-  - if:
-      - condition: template
-        value_template: "{{ is_automation_off and trigger.id not in ['startup'] }}"
-    then:
-      - service: logbook.log
-        data:
-          name: "Klima-Steuerung"
-          message: "Automation wurde deaktiviert. Setze BT-HVAC-Modus auf 'off'."
-          entity_id: "{{ this.entity_id }}"
-      - repeat:
-          for_each: "{{ input_trvs }}"
-          sequence:
-            # Setze den HVAC-Modus auf 'off'
-            - if:
-                - condition: template
-                  value_template: "{{ states(repeat.item) != 'off' }}"
-              then:
-                - service: climate.set_hvac_mode
-                  data:
-                    entity_id: "{{ repeat.item }}"
-                    hvac_mode: off
-      - stop: "Automation deaktiviert."
-
   # Hauptlogik: BT-Entität steuern
   - variables:
       changes_to_apply: >
