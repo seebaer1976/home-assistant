@@ -1,12 +1,10 @@
 blueprint:
-  name: Erweiterte Heizungssteuerung V5 (BT Companion - Minimal)
-  author: panhans
+  name: Klima-Planungsmodul für Better Thermostat
+  author: d187
   homeassistant:
     min_version: "2024.10.0"
   description: >
-    🔥 Die minimalistischste Version der erweiterten Heizungssteuerung V5.
-    
-    AHC dient ausschließlich als übergeordnete Logik-Ebene, die die **Ziel-Temperatur**
+    Dieses Modul dient als übergeordnete Logik-Ebene, die die **Ziel-Temperatur**
     und den **HVAC-Modus** (heat/cool/auto oder off) basierend auf Anwesenheit und Zeitplänen
     an die Better Thermostat (BT) Entität(en) übergibt.
     
@@ -26,10 +24,10 @@ blueprint:
 
     **Ziel-Entität**: **Ihre Better Thermostat (BT) Klima-Entität.**
 
-    **Version**: 5.3.4 (BT-Companion - minimal, angepasst)
+    **Version**: 5.3.4 (BT-Companion - final)
 
     **Hilfe & FAQ**: [Advanced Heating Control](https://community.home-assistant.io/t/advanced-heating-control/469873)
-  source_url: https://github.com/panhans/HomeAssistant/blob/main/blueprints/automation/panhans/advanced_heating_control_bt_companion_minimal.yaml
+  source_url: https://github.com/panhans/HomeAssistant/blob/main/blueprints/automation/panhans/klima_planungsmodul_fuer_better_thermostat.yaml
   domain: automation
   input:
     thermostat_section:
@@ -367,7 +365,7 @@ variables:
   is_people_home: "{{ people_home_count > 0 }}"
   is_someone_just_arrived: "{{ person_states | select('equalto', 'just_arrived') | list | count > 0 }}"
 
-  # Komfort-Temperatur (statisch oder Entität)
+  # Ziel-Temperatur (statisch oder Entität)
   comfort_temp: >
     {% set temp_value = state_attr(input_temperature_comfort, 'state') | default(states(input_temperature_comfort), true) | default(namespace(s = 0)) %}
     {% if temp_value.s == 0 %}
@@ -489,7 +487,7 @@ variables:
   temp_target: >
     {% set result = eco_temp | float %}
 
-    # Komfort-Modus
+    # Ziel-Modus
     {% if mode == 'comfort' %}
       {% set result = comfort_temp | float %}
     # Eco-Modus
@@ -505,7 +503,7 @@ variables:
     {{ result }}
 
   # HVAC-Modus
-  # AHC setzt den HVAC-Modus nur auf 'off' im Falle eines globalen Ausschalters.
+  # Das Modul setzt den HVAC-Modus nur auf 'off' im Falle eines globalen Ausschalters.
   # Ansonsten wird der definierte HVAC-Modus (z.B. heat) verwendet, da BT die Detailsteuerung übernimmt.
   hvac_mode: >
     {% set mode_map = {'eco': input_hvac_mode, 'comfort': input_hvac_mode} %}
@@ -599,7 +597,7 @@ action:
     then:
       - service: logbook.log
         data:
-          name: "AHC (BT Companion)"
+          name: "Klima-Planungsmodul"
           message: "Automation wurde deaktiviert. Setze BT-HVAC-Modus auf 'off'."
           entity_id: "{{ this.entity_id }}"
       - repeat:
@@ -639,7 +637,7 @@ action:
       # Protokollierung der Änderungen
       - service: logbook.log
         data:
-          name: "AHC (BT Companion)"
+          name: "Klima-Planungsmodul"
           message: "Modus: {{ mode }}, Zieltemperatur: {{ temp_target_with_frost }}, HVAC: {{ hvac_mode }}, Änderungen an {{ changes_to_apply | count }} BT-Entitäten."
           entity_id: "{{ this.entity_id }}"
 
