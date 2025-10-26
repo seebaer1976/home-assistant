@@ -18,19 +18,22 @@ blueprint:
     **Umschaltung auf Eco** bei Abwesenheit von Personen.
 
     **Frostschutz** als Mindesttemperatur-Override.
+    
+    **Automatisches Pausieren:** Die Steuerung pausiert, wenn BT oder eine externe Logik
+    einen TRV auf den Modus `off` setzt. Sie nimmt die Steuerung automatisch wieder auf, 
+    wenn der Modus wieder auf `heat`, `cool` oder `auto` gestellt wird.
 
     
     **WICHTIGER HINWEIS:**
-    Globale Steuerungsparameter (Master-Schalter, Mindest-Außentemperatur, Mindest-Raumtemperatur)
-    sollten in der **Better Thermostat Integration** selbst konfiguriert werden,
-    da diese dort intelligenter verarbeitet werden.
+    Globale Steuerungsparameter (Master-Schalter, Mindest-Außentemperatur etc.)
+    sollten in der **Better Thermostat Integration** selbst konfiguriert werden.
 
 
     **Ziel-Entität**: **Ihre Better Thermostat (BT) Klima-Entität.**
   source_url: https://github.com/seebaer1976/home-assistant/blob/main/blueprints/trhs-steuerung.yaml
   domain: automation
   
-  # NEUE STRUKTUR
+  # INPUT-STRUKTUR
   input:
     thermostat_section:
       name: 🔥 Thermostat & HVAC-Modus
@@ -182,12 +185,9 @@ blueprint:
           selector:
             duration:
 
-    # Globale Ein-/Ausschalt-Optionen (ENTFERNT)
-
 variables:
   # Thermostate / Sensoren
   input_trvs: !input input_trvs
-  # input_temperature_sensor entfernt (da nur für Globale Steuerung)
 
   # Personen
   input_persons: !input input_persons
@@ -341,8 +341,7 @@ trigger:
   - platform: state
     entity_id: "{{ input_trvs }}"
     attribute: hvac_mode
-    not_to:
-      - "{{ hvac_mode }}"
+    # Hier feuert der Trigger auch, wenn BT den Zustand auf 'off' setzt
     id: trv_hvac_mode_change
 
   # 4. Auslöser für Änderungen anderer relevanter Entitäten
@@ -415,6 +414,23 @@ action:
             - variables:
                 thermostat: "{{ repeat.item }}"
             
+            # *** NEUE LOGIK: BT-Off-Override (Respektiert externes 'off') ***
+            - if:
+                - condition: template
+                  value_template: >
+                    {# Prüft, ob der TRV aktuell auf 'off' ist (extern gesetzt) und die Automation
+                       eigentlich 'heat/cool' möchte. Wenn ja, wird die Steuerung pausiert. #}
+                    {% set current_hvac = states(thermostat) | lower %}
+                    {% set desired_hvac = mode | lower %}
+                    {{ current_hvac == 'off' and desired_hvac in ['heat', 'cool', 'auto', 'heat_cool'] }}
+              then:
+                - service: logbook.log
+                  data:
+                    name: "Klima-Steuerung"
+                    message: "BT-Entität {{ thermostat }} ist extern auf 'off' gesetzt. Steuerung pausiert, um manuelles/globales Abschalten zu respektieren."
+                    entity_id: "{{ this.entity_id }}"
+                - continue # Springt zur nächsten Entität in der Schleife
+
             # Setze HVAC-Modus
             - if:
                 - condition: template
