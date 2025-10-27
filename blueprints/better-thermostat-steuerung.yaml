@@ -410,4 +410,43 @@ action:
       - repeat:
           for_each: "{{ changes_to_apply }}"
           sequence:
-            - variables:
+            # Variablen-Alias entfernt, nutze stattdessen 'repeat.item'
+            
+            # *** NEUE LOGIK: BT-Off-Override (Respektiert externes 'off') ***
+            - if:
+                - condition: template
+                  value_template: >
+                    {# Prüft, ob der TRV aktuell auf 'off' ist (extern gesetzt) und die Automation
+                       eigentlich 'heat/cool' möchte. Wenn ja, wird die Steuerung pausiert. #}
+                    {% set current_hvac = states(repeat.item) | lower %}
+                    {% set desired_hvac = mode | lower %}
+                    {{ current_hvac == 'off' and desired_hvac in ['heat', 'cool', 'auto', 'heat_cool'] }}
+              then:
+                - service: logbook.log
+                  data:
+                    name: "Klima-Steuerung"
+                    message: "BT-Entität {{ repeat.item }} ist extern auf 'off' gesetzt. Steuerung pausiert, um manuelles/globales Abschalten zu respektieren."
+                    entity_id: "{{ this.entity_id }}"
+                - continue: true # Explizite Dictionary-Form
+              
+            # Setze HVAC-Modus
+            - if:
+                - condition: template
+                  value_template: "{{ states(repeat.item) | lower != mode | lower  }}"
+              then:
+                - service: climate.set_hvac_mode
+                  data:
+                    entity_id: "{{ repeat.item }}"
+                    hvac_mode: "{{ mode }}"
+
+            # Setze Temperatur
+            - if:
+                - condition: template
+                  value_template: "{{ state_attr(repeat.item, 'temperature') != temp_target and mode != 'off' }}"
+              then:
+                - service: climate.set_temperature
+                  data:
+                    entity_id: "{{ repeat.item }}"
+                    temperature: "{{ temp_target | float }}"
+
+mode: queued
