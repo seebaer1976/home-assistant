@@ -412,6 +412,8 @@ action:
           sequence:
             
             # *** NEUE LOGIK: BT-Off-Override (Respektiert externes 'off') ***
+            # Das erste Element der Sequence ist nun die if-Anweisung,
+            # die mit einem Bindestrich (-) als Listenelement beginnt.
             - if:
                 - condition: template
                   value_template: >
