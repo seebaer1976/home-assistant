@@ -374,80 +374,81 @@ trigger:
 
 
 # Aktion
-action:
-  # Hauptlogik: BT-Entität steuern
-  - variables:
-      changes_to_apply: >
-        {% set changes = namespace(trvs = []) %}
-        {% for thermostat in input_trvs %}
-          {% set current_temp = state_attr(thermostat, 'temperature') %}
-          {% set current_hvac_mode = states(thermostat) %}
-          
-          {% if current_hvac_mode != hvac_mode %}
-            {% set changes.trvs = changes.trvs + [thermostat] %}
-          {% elif current_temp | float != temp_target_with_frost | float and hvac_mode != 'off' %}
-            {% set changes.trvs = changes.trvs + [thermostat] %}
-          {% endif %}
-        {% endfor %}
-        {{ changes.trvs | unique | list }}
-
-  - if:
-      - condition: template
-        value_template: "{{ changes_to_apply | count | int > 0 }}"
-    then:
-      # Protokollierung der Änderungen
-      - service: logbook.log
-        data:
-          name: "Klima-Steuerung"
-          message: "Modus: {{ mode }}, Zieltemperatur: {{ temp_target_with_frost }}, HVAC: {{ hvac_mode }}, Änderungen an {{ changes_to_apply | count }} BT-Entitäten."
-          entity_id: "{{ this.entity_id }}"
-
-      # Variablen für die Schleife festlegen (werden außerhalb des repeat-Blocks global definiert)
+actions:
+  - action:
+      # Hauptlogik: BT-Entität steuern
       - variables:
-          mode: "{{ hvac_mode }}"
-          temp_target: "{{ temp_target_with_frost }}"
-
-      - repeat:
-          for_each: "{{ changes_to_apply }}"
-          sequence:
-            
-            # *** NEUE LOGIK: BT-Off-Override (Respektiert externes 'off') ***
-            # Das erste Element der Sequence ist nun die if-Anweisung,
-            # die mit einem Bindestrich (-) als Listenelement beginnt.
-            - if:
-                - condition: template
-                  value_template: >
-                    {# Prüft, ob der TRV aktuell auf 'off' ist (extern gesetzt) und die Automation
-                       eigentlich 'heat/cool' möchte. Wenn ja, wird die Steuerung pausiert. #}
-                    {% set current_hvac = states(repeat.item) | lower %}
-                    {% set desired_hvac = mode | lower %}
-                    {{ current_hvac == 'off' and desired_hvac in ['heat', 'cool', 'auto', 'heat_cool'] }}
-              then:
-                - service: logbook.log
-                  data:
-                    name: "Klima-Steuerung"
-                    message: "BT-Entität {{ repeat.item }} ist extern auf 'off' gesetzt. Steuerung pausiert, um manuelles/globales Abschalten zu respektieren."
-                    entity_id: "{{ this.entity_id }}"
-                - continue: true
+          changes_to_apply: >
+            {% set changes = namespace(trvs = []) %}
+            {% for thermostat in input_trvs %}
+              {% set current_temp = state_attr(thermostat, 'temperature') %}
+              {% set current_hvac_mode = states(thermostat) %}
               
-            # Setze HVAC-Modus
-            - if:
-                - condition: template
-                  value_template: "{{ states(repeat.item) | lower != mode | lower  }}"
-              then:
-                - service: climate.set_hvac_mode
-                  data:
-                    entity_id: "{{ repeat.item }}"
-                    hvac_mode: "{{ mode }}"
-
-            # Setze Temperatur
-            - if:
-                - condition: template
-                  value_template: "{{ state_attr(repeat.item, 'temperature') != temp_target and mode != 'off' }}"
-              then:
-                - service: climate.set_temperature
-                  data:
-                    entity_id: "{{ repeat.item }}"
-                    temperature: "{{ temp_target | float }}"
+              {% if current_hvac_mode != hvac_mode %}
+                {% set changes.trvs = changes.trvs + [thermostat] %}
+              {% elif current_temp | float != temp_target_with_frost | float and hvac_mode != 'off' %}
+                {% set changes.trvs = changes.trvs + [thermostat] %}
+              {% endif %}
+            {% endfor %}
+            {{ changes.trvs | unique | list }}
+    
+      - if:
+          - condition: template
+            value_template: "{{ changes_to_apply | count | int > 0 }}"
+        then:
+          # Protokollierung der Änderungen
+          - service: logbook.log
+            data:
+              name: "Klima-Steuerung"
+              message: "Modus: {{ mode }}, Zieltemperatur: {{ temp_target_with_frost }}, HVAC: {{ hvac_mode }}, Änderungen an {{ changes_to_apply | count }} BT-Entitäten."
+              entity_id: "{{ this.entity_id }}"
+    
+          # Variablen für die Schleife festlegen (werden außerhalb des repeat-Blocks global definiert)
+          - variables:
+              mode: "{{ hvac_mode }}"
+              temp_target: "{{ temp_target_with_frost }}"
+    
+          - repeat:
+              for_each: "{{ changes_to_apply }}"
+              sequence:
+                
+                # *** NEUE LOGIK: BT-Off-Override (Respektiert externes 'off') ***
+                # Das erste Element der Sequence ist nun die if-Anweisung,
+                # die mit einem Bindestrich (-) als Listenelement beginnt.
+                - if:
+                    - condition: template
+                      value_template: >
+                        {# Prüft, ob der TRV aktuell auf 'off' ist (extern gesetzt) und die Automation
+                           eigentlich 'heat/cool' möchte. Wenn ja, wird die Steuerung pausiert. #}
+                        {% set current_hvac = states(repeat.item) | lower %}
+                        {% set desired_hvac = mode | lower %}
+                        {{ current_hvac == 'off' and desired_hvac in ['heat', 'cool', 'auto', 'heat_cool'] }}
+                  then:
+                    - service: logbook.log
+                      data:
+                        name: "Klima-Steuerung"
+                        message: "BT-Entität {{ repeat.item }} ist extern auf 'off' gesetzt. Steuerung pausiert, um manuelles/globales Abschalten zu respektieren."
+                        entity_id: "{{ this.entity_id }}"
+                    - continue: true
+                  
+                # Setze HVAC-Modus
+                - if:
+                    - condition: template
+                      value_template: "{{ states(repeat.item) | lower != mode | lower  }}"
+                  then:
+                    - service: climate.set_hvac_mode
+                      data:
+                        entity_id: "{{ repeat.item }}"
+                        hvac_mode: "{{ mode }}"
+    
+                # Setze Temperatur
+                - if:
+                    - condition: template
+                      value_template: "{{ state_attr(repeat.item, 'temperature') != temp_target and mode != 'off' }}"
+                  then:
+                    - service: climate.set_temperature
+                      data:
+                        entity_id: "{{ repeat.item }}"
+                        temperature: "{{ temp_target | float }}"
 
 mode: queued
