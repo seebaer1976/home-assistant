@@ -410,8 +410,6 @@ action:
       - repeat:
           for_each: "{{ changes_to_apply }}"
           sequence:
-            # Die fehlerhafte 'variables'-Definition wurde hier entfernt.
-            # Stattdessen wird direkt 'repeat.item' verwendet.
             
             # *** NEUE LOGIK: BT-Off-Override (Respektiert externes 'off') ***
             - if:
@@ -428,7 +426,7 @@ action:
                     name: "Klima-Steuerung"
                     message: "BT-Entität {{ repeat.item }} ist extern auf 'off' gesetzt. Steuerung pausiert, um manuelles/globales Abschalten zu respektieren."
                     entity_id: "{{ this.entity_id }}"
-                - continue: true # Explizite Dictionary-Form
+                - continue: true
               
             # Setze HVAC-Modus
             - if:
