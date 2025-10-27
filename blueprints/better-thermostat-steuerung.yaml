@@ -410,7 +410,8 @@ action:
       - repeat:
           for_each: "{{ changes_to_apply }}"
           sequence:
-            # Variablen-Alias entfernt, nutze stattdessen 'repeat.item'
+            # Die fehlerhafte 'variables'-Definition wurde hier entfernt.
+            # Stattdessen wird direkt 'repeat.item' verwendet.
             
             # *** NEUE LOGIK: BT-Off-Override (Respektiert externes 'off') ***
             - if:
