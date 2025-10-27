@@ -402,7 +402,7 @@ action:
           message: "Modus: {{ mode }}, Zieltemperatur: {{ temp_target_with_frost }}, HVAC: {{ hvac_mode }}, Änderungen an {{ changes_to_apply | count }} BT-Entitäten."
           entity_id: "{{ this.entity_id }}"
 
-      # Variablen für die Schleife festlegen
+      # Variablen für die Schleife festlegen (werden außerhalb des repeat-Blocks global definiert)
       - variables:
           mode: "{{ hvac_mode }}"
           temp_target: "{{ temp_target_with_frost }}"
